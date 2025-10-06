@@ -8,6 +8,7 @@ int dsh_cd(char** args);
 int dsh_help(char** args);
 int dsh_exit(char** args);
 int dsh_banner(char** args);
+int dsh_history(char** args);
 
 #endif 
 
