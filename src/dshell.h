@@ -3,10 +3,15 @@
 
 #include <stdbool.h>
 
-typedef struct {
-  bool running;
-  int background_process;
-  char** history_args;
+typedef struct Shell {
+    bool running;
+    int background_process;
+    char **history_args;
+
+    int history_num;
+    int num_builtins;
+    char **builtin_str;
+    int (**builtin_func)(char **args, struct Shell *shell); 
 } Shell;
 
 Shell* shell_init();

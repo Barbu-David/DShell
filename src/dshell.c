@@ -1,25 +1,42 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <stdbool.h>
 #include "dshell.h"
 #include "ui.h"
 #include "read_write.h"
 #include "line_tokenizer.h"
 #include "dsh_execute.h"
+#include "builtins.h"
 
-Shell* shell_init() 
-{
+Shell* shell_init() {
+    print_banner(PURPLE);
 
-  print_banner(PURPLE);
-  Shell* dshell = (Shell*) malloc(sizeof(Shell));
+    Shell* dshell = malloc(sizeof(Shell));
+    if (!dshell) {
+        print_error("malloc failed");
+        exit(1);
+    }
 
-  if(!dshell) print_error("malloc failed");
+    dshell->running = true;
+    dshell->background_process = 0;
+    dshell->history_args = NULL;
 
-  dshell->running=true;
-  dshell->background_process=0;
-  dshell->history_args=NULL;
+    static char *builtins[] = {"help", "cd", "banner", "!!", "exit"};
+    static int (*funcs[])(char **args, struct Shell *shell) = {
+        dsh_help,
+        dsh_cd,
+        dsh_banner,
+        dsh_history,
+        dsh_exit
+    };
+    
+    dshell->history_num= 3;
+    dshell->num_builtins = 5;
+    dshell->builtin_str = builtins;
+    dshell->builtin_func = funcs;
 
-  return dshell;
+    return dshell;
 }
 
 void shell_close(Shell* dshell) 

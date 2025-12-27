@@ -13,26 +13,6 @@
 #include <errno.h>
 #include <stdbool.h>
 
-char *builtin_str[] = {
-  "help",
-  "cd",
-  "banner",
-  "!!",
-  "exit"
-};
-
-int (*builtin_func[]) (char **, Shell*) = {
-  &dsh_help,
-  &dsh_cd,
-  &dsh_banner,
-  &dsh_history,
-  &dsh_exit
-};
-
-int dsh_num_builtins() {
-  return sizeof(builtin_str) / sizeof(char *);
-}
-
 char ** copy_args(char **args) {
   if (!args) return NULL;
 
@@ -62,49 +42,16 @@ void free_args(char **args) {
   free(args);
 }
 
-int dsh_banner(char** args, Shell* dshell)
-{
-  (void) args;
-  (void) dshell;
-  print_banner(PURPLE);
-  return 0;
-}
-
-int dsh_cd(char** args, Shell* dshell)
-{  
-  (void) dshell;
-  if (args[1] == NULL) print_error("lsh: expected argument to \"cd\"\n");
-  else if (chdir(args[1]) != 0) print_error("chdir failed");
-  return 0;
-}
-
-int dsh_help(char** args, Shell* dshell) 
-{
-  (void) dshell;
-  (void) args;
-  printf("Hello, this is dshell. It has the following builtins:\n");
-  for(int i=0; i< dsh_num_builtins(); i++) printf("%s\n", builtin_str[i]);
-  printf("Type program names and arguments, and hit enter.\n");
-  return 0;
-}
-
-int dsh_exit(char** args, Shell* dshell)
-{
-  (void) args;
-  dshell->running=false;
-  return 0;
-}
-
 int dsh_execute(char **args, Shell* dshell)
 {
 
   if (args[0] == NULL) return 0;
 
   int status;
-  for (int i = 0; i < dsh_num_builtins(); i++) 
-    if (strcmp(args[0], builtin_str[i]) == 0) {
-      status=(*builtin_func[i])(args, dshell);
-      if(*builtin_func[i] == dsh_history) goto ret_no_update;
+  for (int i = 0; i < dshell->num_builtins; i++) 
+    if (strcmp(args[0], dshell->builtin_str[i]) == 0) {
+      status=(*(dshell->builtin_func[i]))(args, dshell);
+      if(i == dshell->history_num) goto ret_no_update;
       goto ret;
     }
 
@@ -158,19 +105,4 @@ void reap_background_process(Shell* dshell) {
     if (pid == -1 && errno != ECHILD)
         print_error("Background process waitpid failed");
 }
-
-
-
-int dsh_history(char ** args, Shell* dshell) 
-{
-  (void)args;
-
-  if(dshell->history_args==NULL) {
-    print_error("Empty history");
-    return 1;
-  }
-
-  return dsh_execute(dshell->history_args, dshell);
-}
-
 
