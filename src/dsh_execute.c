@@ -10,6 +10,7 @@
 #include "colors.h"
 #include <sys/wait.h>
 #include <errno.h>
+#include <stdbool.h>
 
 char *builtin_str[] = {
   "help",
@@ -17,7 +18,6 @@ char *builtin_str[] = {
   "banner",
   "!!",
   "exit"
-
 };
 
 int (*builtin_func[]) (char **) = {
@@ -69,6 +69,7 @@ int dsh_banner(char** args)
   print_banner(PURPLE);
   return 0;
 }
+
 int dsh_cd(char** args)
 {
   if (args[1] == NULL) print_error("lsh: expected argument to \"cd\"\n");
@@ -105,44 +106,59 @@ int dsh_execute(char **args)
       goto ret;
     }
 
-  for(int idx = 0; args[idx]; idx++) if(strcmp(args[idx], "&") == 0 && !args[idx+1]) {
-    args[idx]=NULL;
-    status= launch_task_nb(args);
-    goto ret;
+  char *infile = NULL;
+  char *outfile = NULL;
+  bool background = false;
+
+  int j = 0;
+  char *argv[BUFSIZ]; // temporary array for execvp
+  for (int i = 0; args[i]; i++) {
+
+    if (strcmp(args[i], "<") == 0) {
+      if (!args[i+1]) { print_error("Syntax error: no input file"); return -1; }
+      infile = args[++i];
+    }
+    else if (strcmp(args[i], ">") == 0) {
+      if (!args[i+1]) { print_error("Syntax error: no output file"); return -1; }
+      outfile = args[++i];
+    }
+    else if (strcmp(args[i], "&") == 0 && !args[i+1]) {
+      background = true;
+    }
+    else {
+      argv[j++] = args[i];
+    }
   }
+  argv[j] = NULL;
 
-  status= launch_task(args);
+  status= launch_task(argv, infile, outfile, !background);
 
-  ret:
+ret:
   char **new_copy = copy_args(args);  
   free_args(last_args);
   last_args = new_copy;       
 
-  ret_no_update:
+ret_no_update:
 
   return status;
 }
 
-int reap_background_process(int background_process) 
-{
+int reap_background_process(int background_process) {
+    int status;
+    pid_t pid;
 
-  int status;
-  int i;
-
-  do {
-    i = waitpid(-1, &status, WNOHANG);
-    if(i==-1) {
-
-      if(errno!=ECHILD) print_error("Background process failed");
-      background_process--;
-      i=0;
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        printf("[Background process %d finished]\n", pid);
+        background_process--;
     }
-    if(i>0) background_process--;
-  } while(i); 
 
-  return background_process;
+    if (pid == -1 && errno != ECHILD)
+        print_error("Background process waitpid failed");
 
+    return background_process;
 }
+
+
 
 int dsh_history(char ** args) 
 {

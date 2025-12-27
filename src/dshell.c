@@ -5,9 +5,11 @@ int main(void)
   
   print_banner(PURPLE);
   int background_process = 0;
-  while(1) {
+ 
+  while(true) {
 
     print_shell_prompt();
+
     char* line = read_line();
     char** args = tokenize_line(line);
   
