@@ -8,6 +8,8 @@
 #include "line_tokenizer.h"
 #include "dsh_execute.h"
 #include "builtins.h"
+#include "args.h"
+#include "background.h"
 
 Shell* shell_init() {
     print_banner(PURPLE);

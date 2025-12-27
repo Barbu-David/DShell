@@ -2,7 +2,6 @@
 #define LAUNCHER_H
 
 #include <stdbool.h>
-#define BPROCESS 256
 #include <fcntl.h>    
 #include <sys/stat.h>
 

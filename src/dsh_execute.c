@@ -1,5 +1,3 @@
-#define _POSIX_C_SOURCE 200809L
-
 #include "dshell.h"
 #include "dsh_execute.h"
 #include "launcher.h"
@@ -9,38 +7,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "ui.h"
-#include <sys/wait.h>
-#include <errno.h>
 #include <stdbool.h>
-
-char ** copy_args(char **args) {
-  if (!args) return NULL;
-
-  int count = 0;
-  while (args[count]) count++;  
-
-  char **copy = malloc((count + 1) * sizeof(char*));
-  if (!copy) {
-    print_error("malloc failed");
-    exit(1);
-  }
-
-  for (int i = 0; i < count; i++) {
-    copy[i] = strdup(args[i]);
-    if (!copy[i]) {
-      print_error("strdup");
-      exit(1);
-    }
-  }
-  copy[count] = NULL;
-  return copy;
-}
-
-void free_args(char **args) {
-  if (!args) return;
-  for (int i = 0; args[i]; i++) free(args[i]);
-  free(args);
-}
+#include "args.h"
 
 int dsh_execute(char **args, Shell* dshell)
 {
@@ -91,18 +59,5 @@ ret:
 ret_no_update:
 
   return status;
-}
-
-void reap_background_process(Shell* dshell) {
-    int status;
-    pid_t pid;
-
-    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
-        printf("[Background process %d finished]\n", pid);
-        dshell->background_process--;
-    }
-
-    if (pid == -1 && errno != ECHILD)
-        print_error("Background process waitpid failed");
 }
 
