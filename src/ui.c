@@ -1,5 +1,4 @@
-#include "banner.h"
-#include "colors.h"
+#include "ui.h"
 #include <stdio.h>
 
 void print_banner(const char *color) {

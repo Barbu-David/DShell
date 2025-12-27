@@ -59,6 +59,6 @@ int launch_task(char** args, const char *infile, const char *outfile, bool block
   else return -1;
   } 
 
-  return BPROCESS;
+  return 0;
 }
 

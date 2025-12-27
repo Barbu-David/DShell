@@ -1,6 +1,6 @@
 #define _GNU_SOURCE
 
-#include "colors.h"
+#include "ui.h"
 #include "read_write.h"
 #include <unistd.h>
 #include <stdlib.h>

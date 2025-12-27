@@ -1,29 +1,46 @@
+#include <stdlib.h>
+#include <string.h>
+
 #include "dshell.h"
+#include "ui.h"
+#include "read_write.h"
+#include "line_tokenizer.h"
+#include "dsh_execute.h"
 
-int main(void)
+Shell* shell_init() 
 {
-  
+
   print_banner(PURPLE);
-  int background_process = 0;
- 
-  while(true) {
+  Shell* dshell = (Shell*) malloc(sizeof(Shell));
 
-    print_shell_prompt();
+  if(!dshell) print_error("malloc failed");
 
-    char* line = read_line();
-    char** args = tokenize_line(line);
-  
-    int status = dsh_execute(args);
-    
-    if(status == -1) print_error("Failed to execute program");
-    if(status == BPROCESS) background_process++;
-    
-    if(background_process) background_process = reap_background_process(background_process); 
+  dshell->running=true;
+  dshell->background_process=0;
+  dshell->history_args=NULL;
 
-    free(args);
-    free(line);
+  return dshell;
+}
 
-  }
+void shell_close(Shell* dshell) 
+{
+  free_args(dshell->history_args);
+  free(dshell);
+}
 
-  return 0;
+void shell_step(Shell* dshell) 
+{
+  print_shell_prompt();
+
+  char* line = read_line();
+  char** args = tokenize_line(line);
+  int status = dsh_execute(args, dshell);
+
+  if(status == -1) print_error("Failed to execute program");
+
+  if(dshell->background_process) reap_background_process(dshell); 
+
+  free(args);
+  free(line);
+
 }

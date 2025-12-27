@@ -1,5 +1,7 @@
-#ifndef COLORS_H
-#define COLORS_H
+#ifndef UI_H
+#define UI_H
+
+void print_banner(const char *color);
 
 #define RED     "\x1b[31m"
 #define GREEN   "\x1b[32m"
