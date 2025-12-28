@@ -15,6 +15,7 @@
 #include <stdio.h>
 
 Shell* shell_init() {
+
     print_banner(PURPLE);
 
     Shell* dshell = malloc(sizeof(Shell));

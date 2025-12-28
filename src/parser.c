@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 #include "parser.h"
 #include <stddef.h>
 #include <stdlib.h>
@@ -11,7 +12,9 @@ Command* parse(char** raw_args, Shell* dshell)
   
   if (raw_args[0] == NULL) return 0;
   
-  Command* command = command_init(sizeof(raw_args));
+  size_t count = 0;
+  while (raw_args[count]) count++;
+  Command* command = command_init(count);
   
   command->args[0] = raw_args[0];
 
@@ -29,11 +32,11 @@ Command* parse(char** raw_args, Shell* dshell)
 
     if (strcmp(raw_args[i], "<") == 0) {
       if (!raw_args[i+1]) { print_error("Syntax error: no input file"); return NULL; }
-      command->infile = raw_args[++i];
+      command->infile = strdup(raw_args[++i]);
     }
     else if (strcmp(raw_args[i], ">") == 0) {
       if (!raw_args[i+1]) { print_error("Syntax error: no output file"); return NULL; }
-      command->outfile = raw_args[++i];
+      command->outfile = strdup(raw_args[++i]);
     }
     else if (strcmp(raw_args[i], "&") == 0 && !raw_args[i+1]) {
       command->background = true;

@@ -7,17 +7,17 @@
 void free_command(Command* c)
 {
   free_args(c->args);
-  c->infile=NULL;
-  c->outfile=NULL;
   c->execute=NULL;
+  if(c->infile) free(c->infile);
+  if(c->outfile) free(c->outfile);
   free(c);
 }
 
 void free_command_deep(Command* c)
 {
   free_args_deep(c->args);
-  c->infile=NULL;
-  c->outfile=NULL;
+  if(c->infile) free(c->infile);
+  if(c->outfile) free(c->outfile);
   c->execute=NULL;
   free(c);
 }
