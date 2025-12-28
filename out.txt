@@ -1,7 +1,0 @@
-dshell
-Makefile
-out.txt
-src
-TO-DO
-vgcore.17883
-vgcore.18147
