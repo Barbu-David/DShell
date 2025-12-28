@@ -10,6 +10,9 @@
 #include "args.h"
 #include "background.h"
 #include "parser.h"
+#include "commands.h"
+
+#include <stdio.h>
 
 Shell* shell_init() {
     print_banner(PURPLE);
@@ -20,9 +23,9 @@ Shell* shell_init() {
         exit(1);
     }
 
+    dshell->historyCommand = command_init(BUFSIZ);
     dshell->running = true;
     dshell->background_process = 0;
-    dshell->history_args = NULL;
 
     static char *builtins[] = {"help", "cd", "banner", "!!", "exit"};
     static int (*funcs[])(Command* command, struct Shell *shell) = {
@@ -33,7 +36,6 @@ Shell* shell_init() {
         dsh_exit
     };
     
-    dshell->history_num= 3;
     dshell->num_builtins = 5;
     dshell->builtin_str = builtins;
     dshell->builtin_func = funcs;
@@ -43,7 +45,7 @@ Shell* shell_init() {
 
 void shell_close(Shell* dshell) 
 {
-  free_args(dshell->history_args);
+  free_command_deep(dshell->historyCommand);
   free(dshell);
 }
 
@@ -54,14 +56,22 @@ void shell_step(Shell* dshell)
   char* line = read_line();
   char** args = tokenize_line(line);
   Command* command = parse(args, dshell);
-
+  
+  if (!command) {
+        free_args(args);  
+        free(line);
+        return;
+  }
+  
   int status = command->execute(command, dshell);
 
   if(status == -1) print_error("Failed to execute program");
 
   if(dshell->background_process) reap_background_process(dshell); 
 
-  free(args);
+  if(command->to_history) copy_command(command, dshell->historyCommand);
+  
+  free_command(command);
   free(line);
 
 }

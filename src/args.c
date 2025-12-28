@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "read_write.h"
+#include <stdio.h>
 
 char** copy_args(char **args) {
   if (!args) return NULL;
@@ -27,9 +28,32 @@ char** copy_args(char **args) {
   return copy;
 }
 
-void free_args(char **args) {
+void free_args(char **args) 
+{
   if (!args) return;
-  for (int i = 0; args[i]; i++) free(args[i]);
   free(args);
 }
 
+char** init_args(size_t count)
+{
+  char **args = malloc((count + 1) * sizeof(char *));
+  if (!args) {
+    print_error("malloc failed");
+    exit(1);
+  }
+
+  for (size_t i = 0; i <= count; i++) {
+    args[i] = NULL;
+  }
+
+  return args;
+}
+
+void free_args_deep(char **args)
+{
+  if (!args) return;
+  for (size_t i = 0; args[i]; i++) {
+    free(args[i]);
+  }
+  free(args);
+}

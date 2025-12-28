@@ -34,20 +34,23 @@ int dsh_help(Command* command, Shell* dshell)
 
 int dsh_exit(Command* command, Shell* dshell)
 {
-  (void) command;
+  command->to_history=false;
   dshell->running=false;
   return 0;
 }
 
-int dsh_history(Command* command, Shell* dshell) 
+int dsh_history(Command* command, Shell* dshell)
 {
-  (void)command;
 
-  if(dshell->history_args==NULL) {
+  if (!dshell->historyCommand ||
+      !dshell->historyCommand->args ||
+      dshell->historyCommand->args[0] == NULL ||
+      dshell->historyCommand->execute == NULL) {
     print_error("Empty history");
-    return 1;
+    return 0;
   }
+
+  command->to_history = false;
 
   return dshell->historyCommand->execute(dshell->historyCommand, dshell);
 }
-

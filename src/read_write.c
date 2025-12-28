@@ -25,7 +25,7 @@ void print_shell_prompt(void)
 char* read_line(void) 
 {
   char *buf = NULL; 
-  size_t buf_size;
+  size_t buf_size = 0;
 
   if (getline(&buf, &buf_size, stdin) == -1) {
 

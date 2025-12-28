@@ -48,10 +48,6 @@ int launch_task(Command* command, Shell* dshell)
   }
 
 
-  if(command->to_history) dshell->historyCommand = command;
-  //else free command
-
-
   if(!(command->background)) {
   int status;
   pid_t w = waitpid(pid, &status, 0);

@@ -4,16 +4,15 @@
 #include <string.h>
 #include "read_write.h"
 #include "launcher.h"
+#include "commands.h"
 
 Command* parse(char** raw_args, Shell* dshell) 
 {
   
   if (raw_args[0] == NULL) return 0;
   
-  Command* command = malloc(sizeof(Command));
+  Command* command = command_init(sizeof(raw_args));
   
-  command->args = malloc(sizeof(raw_args));
-
   command->args[0] = raw_args[0];
 
   bool builtin = false;
@@ -21,13 +20,8 @@ Command* parse(char** raw_args, Shell* dshell)
   for (int i = 0; i < dshell->num_builtins; i++) 
     if (strcmp(command->args[0], dshell->builtin_str[i]) == 0) {
       command->execute = dshell->builtin_func[i];
-      command->to_history = (i == dshell->history_num) ? true:false;
       builtin = true;
     }
-
-  command->infile = NULL;
-  command->outfile = NULL;
-  command->background = false;
 
   int j = 0;
  
@@ -48,9 +42,10 @@ Command* parse(char** raw_args, Shell* dshell)
       command->args[j++] = raw_args[i];
     }
   }
-  command->args[j] = NULL;
 
   if(!builtin) command->execute = launch_task;
-
+  
+  free(raw_args);    
+ 
   return command;
 }

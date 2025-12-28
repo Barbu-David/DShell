@@ -9,10 +9,8 @@ typedef struct Command Command;
 typedef struct Shell {
     bool running;
     int background_process;
-    char **history_args;
     Command* historyCommand;  
 
-    int history_num;
     int num_builtins;
     char **builtin_str;
     int (**builtin_func)(Command* command, struct Shell *shell); 
