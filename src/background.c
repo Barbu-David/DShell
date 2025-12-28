@@ -2,6 +2,7 @@
 #include <sys/wait.h>
 #include <errno.h>
 #include "read_write.h"
+
 void reap_background_process(Shell* dshell) {
     int status;
     pid_t pid;

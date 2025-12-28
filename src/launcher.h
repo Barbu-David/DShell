@@ -4,11 +4,9 @@
 #include <stdbool.h>
 #include <fcntl.h>    
 #include <sys/stat.h>
+#include "dshell.h"
 
-int launch_task(char** args,
-                const char *infile,
-                const char *outfile,
-                bool blocking);
+int launch_task(Command* command, Shell* dshell);
 
 #endif 
 

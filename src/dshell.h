@@ -3,15 +3,19 @@
 
 #include <stdbool.h>
 
+struct Command;
+typedef struct Command Command;
+
 typedef struct Shell {
     bool running;
     int background_process;
     char **history_args;
+    Command* historyCommand;  
 
     int history_num;
     int num_builtins;
     char **builtin_str;
-    int (**builtin_func)(char **args, struct Shell *shell); 
+    int (**builtin_func)(Command* command, struct Shell *shell); 
 } Shell;
 
 Shell* shell_init();

@@ -2,12 +2,13 @@
 #define BUILTINS_H
 
 #include "dshell.h" 
+#include "parser.h"
 
-int dsh_help(char **args, Shell *shell);
-int dsh_cd(char **args, Shell *shell);
-int dsh_banner(char **args, Shell *shell);
-int dsh_history(char **args, Shell *shell);
-int dsh_exit(char **args, Shell *shell);
+int dsh_help(Command* command, Shell *shell);
+int dsh_cd(Command* command, Shell *shell);
+int dsh_banner(Command* command, Shell *shell);
+int dsh_history(Command* command, Shell *shell);
+int dsh_exit(Command* command, Shell *shell);
 
 #endif
 

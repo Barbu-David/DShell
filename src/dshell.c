@@ -6,10 +6,10 @@
 #include "ui.h"
 #include "read_write.h"
 #include "line_tokenizer.h"
-#include "dsh_execute.h"
 #include "builtins.h"
 #include "args.h"
 #include "background.h"
+#include "parser.h"
 
 Shell* shell_init() {
     print_banner(PURPLE);
@@ -25,7 +25,7 @@ Shell* shell_init() {
     dshell->history_args = NULL;
 
     static char *builtins[] = {"help", "cd", "banner", "!!", "exit"};
-    static int (*funcs[])(char **args, struct Shell *shell) = {
+    static int (*funcs[])(Command* command, struct Shell *shell) = {
         dsh_help,
         dsh_cd,
         dsh_banner,
@@ -53,7 +53,9 @@ void shell_step(Shell* dshell)
 
   char* line = read_line();
   char** args = tokenize_line(line);
-  int status = dsh_execute(args, dshell);
+  Command* command = parse(args, dshell);
+
+  int status = command->execute(command, dshell);
 
   if(status == -1) print_error("Failed to execute program");
 

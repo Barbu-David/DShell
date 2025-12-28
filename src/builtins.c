@@ -4,28 +4,27 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include "dsh_execute.h"
 
-int dsh_banner(char** args, Shell* dshell)
+int dsh_banner(Command* command, Shell* dshell)
 {
-  (void) args;
+  (void) command;
   (void) dshell;
   print_banner(PURPLE);
   return 0;
 }
 
-int dsh_cd(char** args, Shell* dshell)
+int dsh_cd(Command* command, Shell* dshell)
 {  
   (void) dshell;
-  if (args[1] == NULL) print_error("lsh: expected argument to \"cd\"\n");
-  else if (chdir(args[1]) != 0) print_error("chdir failed");
+  if (command->args[1] == NULL) print_error("lsh: expected argument to \"cd\"\n");
+  else if (chdir(command->args[1]) != 0) print_error("chdir failed");
   return 0;
 }
 
-int dsh_help(char** args, Shell* dshell) 
+int dsh_help(Command* command, Shell* dshell) 
 {
   (void) dshell;
-  (void) args;
+  (void) command;
   printf("Hello, this is dshell. It has the following builtins:\n");
   for(int i=0; i< dshell->num_builtins; i++) printf("%s\n", dshell->builtin_str[i]);
   printf("Type program names and arguments, and hit enter.\n");
@@ -33,22 +32,22 @@ int dsh_help(char** args, Shell* dshell)
 
 }
 
-int dsh_exit(char** args, Shell* dshell)
+int dsh_exit(Command* command, Shell* dshell)
 {
-  (void) args;
+  (void) command;
   dshell->running=false;
   return 0;
 }
 
-int dsh_history(char ** args, Shell* dshell) 
+int dsh_history(Command* command, Shell* dshell) 
 {
-  (void)args;
+  (void)command;
 
   if(dshell->history_args==NULL) {
     print_error("Empty history");
     return 1;
   }
 
-  return dsh_execute(dshell->history_args, dshell);
+  return dshell->historyCommand->execute(dshell->historyCommand, dshell);
 }
 
