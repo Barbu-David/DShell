@@ -7,23 +7,13 @@
 void free_command(Command* c)
 {
   free_args(c->args);
-  c->execute=NULL;
-  if(c->infile) free(c->infile);
-  if(c->outfile) free(c->outfile);
-  free(c);
-}
-
-void free_command_deep(Command* c)
-{
-  free_args_deep(c->args);
   if(c->infile) free(c->infile);
   if(c->outfile) free(c->outfile);
   c->execute=NULL;
   free(c);
 }
 
-
-Command* command_init(size_t size)
+Command* init_command()
 {
   
   Command* command = malloc(sizeof(Command));
@@ -32,8 +22,8 @@ Command* command_init(size_t size)
   command->outfile=NULL;
   command->background = false;
   command->to_history = true;
-  command->args = init_args(size);
-  
+  command->args = NULL;
+
   return command;
 }
 
@@ -42,7 +32,7 @@ void copy_command(Command* src, Command* dst)
   if (!src || !dst) return;
 
   if (dst->args) {
-    free_args_deep(dst->args);
+    free_args(dst->args);
     dst->args = NULL;
   }
 

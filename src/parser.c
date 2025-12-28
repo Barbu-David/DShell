@@ -6,6 +6,7 @@
 #include "read_write.h"
 #include "launcher.h"
 #include "commands.h"
+#include "args.h"
 
 Command* parse(char** raw_args, Shell* dshell) 
 {
@@ -14,18 +15,18 @@ Command* parse(char** raw_args, Shell* dshell)
   
   size_t count = 0;
   while (raw_args[count]) count++;
-  Command* command = command_init(count);
-  
-  command->args[0] = raw_args[0];
+
+  Command* command = init_command();
 
   bool builtin = false;
 
   for (int i = 0; i < dshell->num_builtins; i++) 
-    if (strcmp(command->args[0], dshell->builtin_str[i]) == 0) {
+    if (strcmp(raw_args[0], dshell->builtin_str[i]) == 0) {
       command->execute = dshell->builtin_func[i];
       builtin = true;
     }
 
+  char** tmp_args = init_args(count);
   int j = 0;
  
   for (int i = 0; raw_args[i]; i++) {
@@ -42,13 +43,16 @@ Command* parse(char** raw_args, Shell* dshell)
       command->background = true;
     }
     else {
-      command->args[j++] = raw_args[i];
+      tmp_args[j++] = raw_args[i];
     }
   }
 
   if(!builtin) command->execute = launch_task;
-  
-  free(raw_args);    
  
+  command->args = copy_args(tmp_args);
+
+  free(raw_args);    
+  free(tmp_args); 
+
   return command;
 }

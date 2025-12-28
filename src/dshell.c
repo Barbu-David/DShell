@@ -24,7 +24,7 @@ Shell* shell_init() {
         exit(1);
     }
 
-    dshell->historyCommand = command_init(BUFSIZ);
+    dshell->historyCommand = init_command();
     dshell->running = true;
     dshell->background_process = 0;
 
@@ -46,7 +46,7 @@ Shell* shell_init() {
 
 void shell_close(Shell* dshell) 
 {
-  free_command_deep(dshell->historyCommand);
+  free_command(dshell->historyCommand);
   free(dshell);
 }
 

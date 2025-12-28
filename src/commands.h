@@ -14,9 +14,8 @@ typedef struct Command{
     int (*execute)(struct Command*, Shell*);
 } Command;
 
-Command* command_init(size_t size);
-void free_command(Command* c);
+Command* init_command();
 void copy_command(Command* src, Command* dst);
-void free_command_deep(Command* c);
+void free_command(Command* c);
 
 #endif 

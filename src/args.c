@@ -28,12 +28,6 @@ char** copy_args(char **args) {
   return copy;
 }
 
-void free_args(char **args) 
-{
-  if (!args) return;
-  free(args);
-}
-
 char** init_args(size_t count)
 {
   char **args = malloc((count + 1) * sizeof(char *));
@@ -49,7 +43,7 @@ char** init_args(size_t count)
   return args;
 }
 
-void free_args_deep(char **args)
+void free_args(char **args)
 {
   if (!args) return;
   for (size_t i = 0; args[i]; i++) {
