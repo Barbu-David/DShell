@@ -52,7 +52,6 @@ void shell_step(Shell* dshell)
   Command* command = parse(args, dshell);
   
   if (!command) {
-        free_args(args);  
         free(line);
         return;
   }

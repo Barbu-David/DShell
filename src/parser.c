@@ -46,6 +46,7 @@ Command* parse(char** raw_args, Shell* dshell)
     else {
       tmp_args[j++] = raw_args[i];
     }
+
   }
 
   if(!builtin) command->execute = launch_task;

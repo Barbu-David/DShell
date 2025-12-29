@@ -1,10 +1,8 @@
+#include <stdlib.h>
+
 #include "commands.h"
 #include "args.h"
 #include "sf_wraps.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <stddef.h>
 
 void free_command(Command* c)
 {
