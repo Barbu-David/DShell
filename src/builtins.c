@@ -20,7 +20,7 @@ int dsh_banner(Command* command, Shell* dshell)
 int dsh_cd(Command* command, Shell* dshell)
 {  
   (void) dshell;
-  if (command->args[1] == NULL) print_error("lsh: expected argument to \"cd\"\n");
+  if (command->args[1] == NULL) print_error("expected arguments to cd");
   else if (chdir(command->args[1]) != 0) {
     print_error("chdir failed");
     print_error(strerror(errno));

@@ -8,27 +8,30 @@
 #include "sf_wraps.h"
 #include "parser.h"
 
+void assign_executor(const char* c, Shell* dshell, Command* command)
+{
+  for (int i = 0; i < dshell->num_builtins; i++) 
+    if (strcmp(c, dshell->builtin_str[i]) == 0) {
+      command->execute = dshell->builtin_func[i];
+      return;
+    }
+  command->execute =launch_task;
+}
+
 Command* parse(char** raw_args, Shell* dshell) 
 {
-  
+
   if (raw_args[0] == NULL) return 0;
   
-  size_t count = 0;
-  while (raw_args[count]) count++;
-
   Command* command = init_command();
 
-  bool builtin = false;
+  assign_executor(raw_args[0], dshell, command);
 
-  for (int i = 0; i < dshell->num_builtins; i++) 
-    if (strcmp(raw_args[0], dshell->builtin_str[i]) == 0) {
-      command->execute = dshell->builtin_func[i];
-      builtin = true;
-    }
-
-  char** tmp_args = init_args(count);
   int j = 0;
- 
+  size_t count = 0;
+  while (raw_args[count]) count++;
+  char** tmp_args = init_args(count);
+
   for (int i = 0; raw_args[i]; i++) {
 
     if (strcmp(raw_args[i], "<") == 0) {
@@ -45,11 +48,8 @@ Command* parse(char** raw_args, Shell* dshell)
     else {
       tmp_args[j++] = raw_args[i];
     }
-
   }
 
-  if(!builtin) command->execute = launch_task;
- 
   command->args = copy_args(tmp_args);
 
   free(raw_args);    

@@ -9,7 +9,6 @@ void free_command(Command* c)
   free_args(c->args);
   if(c->infile) free(c->infile);
   if(c->outfile) free(c->outfile);
-  c->execute=NULL;
   free(c);
 }
 
@@ -36,6 +35,9 @@ void copy_command(Command* src, Command* dst)
     dst->args = NULL;
   }
 
+  if (dst->infile) free(src->infile); 
+  if (dst->outfile) free(src->outfile);
+   
   dst->background  = src->background;
   dst->to_history  = src->to_history;
   dst->execute     = src->execute;
