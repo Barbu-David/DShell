@@ -1,8 +1,10 @@
 #include "commands.h"
 #include "args.h"
-#include <stddef.h>
-#include <stdlib.h>
+#include "sf_wraps.h"
+
 #include <stdio.h>
+#include <stdlib.h>
+#include <stddef.h>
 
 void free_command(Command* c)
 {
@@ -16,7 +18,7 @@ void free_command(Command* c)
 Command* init_command()
 {
   
-  Command* command = malloc(sizeof(Command));
+  Command* command = (Command*) sf_malloc(sizeof(Command));
   command->execute = NULL;
   command->infile=NULL;
   command->outfile=NULL;

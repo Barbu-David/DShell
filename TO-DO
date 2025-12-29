@@ -1,3 +1,7 @@
 TO DO
 
-memory leaks
+safe chdir
+safe open
+safe fork
+safe execvp
+safe waitpid

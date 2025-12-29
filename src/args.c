@@ -1,9 +1,10 @@
-#define _POSIX_C_SOURCE 200809L
-#include "args.h"
 #include <stdlib.h>
-#include <string.h>
-#include "read_write.h"
 #include <stdio.h>
+#include <string.h>
+
+#include "args.h"
+#include "read_write.h"
+#include "sf_wraps.h"
 
 char** copy_args(char **args) {
   if (!args) return NULL;
@@ -11,30 +12,17 @@ char** copy_args(char **args) {
   int count = 0;
   while (args[count]) count++;  
 
-  char **copy = malloc((count + 1) * sizeof(char*));
-  if (!copy) {
-    print_error("malloc failed");
-    exit(1);
-  }
+  char** copy = (char**) sf_malloc((count + 1) * sizeof(char*));
 
-  for (int i = 0; i < count; i++) {
-    copy[i] = strdup(args[i]);
-    if (!copy[i]) {
-      print_error("strdup");
-      exit(1);
-    }
-  }
+  for (int i = 0; i < count; i++) copy[i] = sf_strdup(args[i]);
+  
   copy[count] = NULL;
   return copy;
 }
 
 char** init_args(size_t count)
 {
-  char **args = malloc((count + 1) * sizeof(char *));
-  if (!args) {
-    print_error("malloc failed");
-    exit(1);
-  }
+  char** args = (char**) sf_malloc((count + 1) * sizeof(char *));
 
   for (size_t i = 0; i <= count; i++) {
     args[i] = NULL;

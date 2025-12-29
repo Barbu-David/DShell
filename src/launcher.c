@@ -1,9 +1,10 @@
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <stdlib.h>
+
 #include "launcher.h"
 #include "read_write.h"
-#include <stdlib.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <sys/wait.h>
 #include "parser.h"
 #include "dshell.h"
 

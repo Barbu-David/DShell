@@ -1,7 +1,5 @@
 #include <stdlib.h>
-#include <string.h>
 
-#include <stdbool.h>
 #include "dshell.h"
 #include "ui.h"
 #include "read_write.h"
@@ -11,18 +9,13 @@
 #include "background.h"
 #include "parser.h"
 #include "commands.h"
-
-#include <stdio.h>
+#include "sf_wraps.h"
 
 Shell* shell_init() {
 
     print_banner(PURPLE);
 
-    Shell* dshell = malloc(sizeof(Shell));
-    if (!dshell) {
-        print_error("malloc failed");
-        exit(1);
-    }
+    Shell* dshell = (Shell*) sf_malloc(sizeof(Shell));
 
     dshell->historyCommand = init_command();
     dshell->running = true;

@@ -1,12 +1,13 @@
 #define _POSIX_C_SOURCE 200809L
-#include "parser.h"
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "read_write.h"
 #include "launcher.h"
 #include "commands.h"
 #include "args.h"
+#include "parser.h"
 
 Command* parse(char** raw_args, Shell* dshell) 
 {
