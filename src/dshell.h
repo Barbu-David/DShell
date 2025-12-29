@@ -3,13 +3,18 @@
 
 #include <stdbool.h>
 
+struct Job;
+typedef struct Job Job;
+
 struct Command;
 typedef struct Command Command;
 
+#define MAX_JOBS 50
+
 typedef struct Shell {
     bool running;
-    int background_process;
     Command* historyCommand;  
+    Job* jobs;
 
     int num_builtins;
     char **builtin_str;

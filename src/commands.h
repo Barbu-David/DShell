@@ -9,12 +9,13 @@ typedef struct Command{
     char** args;              
     char* infile;              
     char* outfile;            
-    bool background;
     bool to_history;
     int (*execute)(struct Command*, Shell*);
 } Command;
 
 Command* init_command();
+Command* build_command(char** raw_args, Shell* dshell, void (*parser) (Command*, int, char**));
+int launch_command(Command* command, Shell* dshell);
 void copy_command(Command* src, Command* dst);
 void free_command(Command* c);
 

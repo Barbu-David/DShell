@@ -6,9 +6,7 @@
 #include "line_tokenizer.h"
 #include "builtins.h"
 #include "args.h"
-#include "background.h"
-#include "parser.h"
-#include "commands.h"
+//#include "background.h"
 #include "sf_wraps.h"
 
 Shell* shell_init() {
@@ -19,7 +17,6 @@ Shell* shell_init() {
 
     dshell->historyCommand = init_command();
     dshell->running = true;
-    dshell->background_process = 0;
 
     static char *builtins[] = {"help", "cd", "banner", "!!", "exit"};
     static int (*funcs[])(Command* command, struct Shell *shell) = {
@@ -49,22 +46,14 @@ void shell_step(Shell* dshell)
 
   char* line = read_line();
   char** args = tokenize_line(line);
-  Command* command = parse(args, dshell);
+  Job* job = build_job(args, dshell);
   
-  if (!command) {
-        free(line);
-        return;
-  }
-  
-  int status = command->execute(command, dshell);
+  int status = launch_job(job, dshell);
 
   if(status == -1) print_error("Failed to execute program");
 
-  if(dshell->background_process) reap_background_process(dshell); 
+ // if(dshell->background_process) reap_background_process(dshell); 
 
-  if(command->to_history) copy_command(command, dshell->historyCommand);
-  
-  free_command(command);
+ // if(command->to_history) copy_command(command, dshell->historyCommand);
   free(line);
-
 }
