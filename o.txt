@@ -1,5 +1,0 @@
-dshell
-Makefile
-o.txt
-src
-TO-DO
