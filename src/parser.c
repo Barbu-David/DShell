@@ -1,5 +1,3 @@
-#define _POSIX_C_SOURCE 200809L
-#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -7,6 +5,7 @@
 #include "launcher.h"
 #include "commands.h"
 #include "args.h"
+#include "sf_wraps.h"
 #include "parser.h"
 
 Command* parse(char** raw_args, Shell* dshell) 
@@ -34,11 +33,11 @@ Command* parse(char** raw_args, Shell* dshell)
 
     if (strcmp(raw_args[i], "<") == 0) {
       if (!raw_args[i+1]) { print_error("Syntax error: no input file"); return NULL; }
-      command->infile = strdup(raw_args[++i]);
+      command->infile = sf_strdup(raw_args[++i]);
     }
     else if (strcmp(raw_args[i], ">") == 0) {
       if (!raw_args[i+1]) { print_error("Syntax error: no output file"); return NULL; }
-      command->outfile = strdup(raw_args[++i]);
+      command->outfile = sf_strdup(raw_args[++i]);
     }
     else if (strcmp(raw_args[i], "&") == 0 && !raw_args[i+1]) {
       command->background = true;

@@ -1,7 +1,3 @@
 TO DO
 
-safe chdir
-safe open
-safe fork
-safe execvp
-safe waitpid
+pipes

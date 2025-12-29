@@ -1,10 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
+#include <string.h>
 
 #include "builtins.h"
 #include "ui.h"
 #include "read_write.h"
+
 
 int dsh_banner(Command* command, Shell* dshell)
 {
@@ -18,7 +21,11 @@ int dsh_cd(Command* command, Shell* dshell)
 {  
   (void) dshell;
   if (command->args[1] == NULL) print_error("lsh: expected argument to \"cd\"\n");
-  else if (chdir(command->args[1]) != 0) print_error("chdir failed");
+  else if (chdir(command->args[1]) != 0) {
+    print_error("chdir failed");
+    print_error(strerror(errno));
+    return 1;
+  }
   return 0;
 }
 

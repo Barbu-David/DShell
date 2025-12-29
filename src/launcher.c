@@ -2,10 +2,13 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <fcntl.h>    
+#include <errno.h>
+#include <string.h>
 
 #include "launcher.h"
 #include "read_write.h"
 #include "commands.h"
+
 
 void child(Command* command) 
 {
@@ -21,24 +24,40 @@ void child(Command* command)
 
   if (command->infile) {
     int fd = open(command->infile, O_RDONLY);
-    if (fd == -1) { print_error("error opening fd"); _exit(127); }
-    if(dup2(fd, STDIN_FILENO) == -1) print_error("dup2 error");
+    if (fd == -1) {
+      print_error("error opening fd");
+      print_error(strerror(errno));
+      _exit(127); 
+    }
+    if (dup2(fd, STDIN_FILENO) == -1) {
+      print_error("dup2 error");
+      print_error(strerror(errno));
+      _exit(127);
+    }
 
     close(fd);
   }
 
   if (command->outfile) {
     int fd = open(command->outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd == -1) { print_error("error opening fd"); _exit(127); }
-    if(dup2(fd, STDOUT_FILENO) == -1) print_error("dup2 error");
+    if (fd == -1) {
+      print_error("error opening fd");
+      print_error(strerror(errno));
+      _exit(127); 
+    }
+    if (dup2(fd, STDOUT_FILENO) == -1) {
+      print_error("dup2 error");
+      print_error(strerror(errno));
+      _exit(127);
+    }
     close(fd);
   }
 
   if(execvp(command->args[0], command->args) == -1) {
+    print_error(strerror(errno));
     print_error("Failed to start program");
     _exit(127);
   }
-
 
 }
 
@@ -50,6 +69,7 @@ int launch_task(Command* command, Shell* dshell)
 
   if(pid<0) {
     print_error("Fork failed");
+    print_error(strerror(errno));
     return -1;
   }
 
@@ -64,6 +84,7 @@ int launch_task(Command* command, Shell* dshell)
   pid_t w = waitpid(pid, &status, 0);
 
   if (w == -1) {
+    print_error(strerror(errno));
     print_error("waitpid");
     return -1;
   }

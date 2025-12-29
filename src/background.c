@@ -5,11 +5,11 @@
 #include "read_write.h"
 #include "background.h"
 
-void reap_background_process(Shell* dshell) {
+void reap_background_process(Shell* dshell) { // plan to refactor into signals
     int status;
     pid_t pid;
 
-    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) { //can only ever pick up bg jobs, since fg is always waited for
         dshell->background_process--;
     }
 

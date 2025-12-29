@@ -1,0 +1,7 @@
+dshell
+Makefile
+o.txt
+out.txt
+src
+TO-DO
+vgcore.11205

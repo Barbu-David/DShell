@@ -40,6 +40,9 @@ void copy_command(Command* src, Command* dst)
   dst->to_history  = src->to_history;
   dst->execute     = src->execute;
 
+  if(src->infile) dst->infile = sf_strdup(src->infile);
+  if(src->outfile) dst->outfile = sf_strdup(src->outfile);
+
   dst->args = copy_args(src->args);
 }
 
