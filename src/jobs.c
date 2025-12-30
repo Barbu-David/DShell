@@ -184,7 +184,8 @@ int launch_job(Job* job, Shell* dshell)
     }
   }
 
-  int status = wait_for_process_group(job->pgid);
+
+  int status = (job->background)? 0:wait_for_process_group(job->pgid);
 
   remove_job(dshell, job);
   free_job(job);
