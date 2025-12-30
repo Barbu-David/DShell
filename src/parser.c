@@ -17,7 +17,14 @@ void first_parser(Command* command, int count, char** args)
 
     if (strcmp(args[i], "<") == 0) {
       if (!args[i+1]) { print_error("Syntax error: no input file"); }
-      command->infile = sf_strdup(args[++i]);
+
+      int fd = open(args[++i], O_RDONLY);
+      if (fd == -1) {
+        print_error("Failed to open input file");
+        print_error(strerror(errno));
+        continue;
+      }
+      command->in_fd = fd;
     }
     else if (strcmp(args[i], ">") == 0) {
       if (args[i+1]) i++;
@@ -38,22 +45,41 @@ void first_parser(Command* command, int count, char** args)
 
 void only_parser(Command* command, int count, char** args)
 {
-
   char** tmp_args = init_args(count);
   int j = 0;
 
   for (int i = 0; args[i]; i++) {
 
     if (strcmp(args[i], "<") == 0) {
-      if (!args[i+1]) { print_error("Syntax error: no input stream"); }
-      command->infile = sf_strdup(args[++i]);
+      if (!args[i+1]) {
+        print_error("Syntax error: no input stream");
+        continue;
+      }
+
+      int fd = open(args[++i], O_RDONLY);
+      if (fd == -1) {
+        print_error("Failed to open input file");
+        print_error(strerror(errno));
+        continue;
+      }
+
+      command->in_fd = fd;
     }
     else if (strcmp(args[i], ">") == 0) {
-      if (!args[i+1]) { print_error("Syntax error: no output stream"); }
-      command->outfile = sf_strdup(args[++i]);
+      if (!args[i+1]) {
+        print_error("Syntax error: no output stream");
+        continue;
+      }
+      int fd = open(args[++i], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+      if (fd == -1) {
+        print_error("Failed to open output file");
+        print_error(strerror(errno));
+        continue;
+      }
+      command->out_fd = fd;
     }
     else if (strcmp(args[i], "&") == 0) {
-      if(!args[i+1]) print_error("Can only use & at the end");
+      if (!args[i+1]) print_error("Can only use & at the end");
     }
     else {
       tmp_args[j++] = args[i];
@@ -61,10 +87,9 @@ void only_parser(Command* command, int count, char** args)
   }
 
   command->args = copy_args(tmp_args);
-
-  free(tmp_args); 
-
+  free(tmp_args);
 }
+
 
 void middle_parser(Command* command, int count, char** args)
 {
@@ -75,9 +100,9 @@ void middle_parser(Command* command, int count, char** args)
   for (int i = 0; args[i]; i++) {
 
     if (strcmp(args[i], "<") == 0) {
-       if (args[i+1]) i++;
+      if (args[i+1]) i++;
       print_error("Can't redirect input in the middle of the pipeline. Intput stream ignored");
-    
+
     }
     else if (strcmp(args[i], ">") == 0) {
       if (args[i+1]) i++;
@@ -105,14 +130,34 @@ void final_parser(Command* command, int count, char** args)
   for (int i = 0; args[i]; i++) {
 
     if (strcmp(args[i], "<") == 0) {
-        if (args[i+1]) i++;
-      print_error("Can't redirect input at the end of the pipeline. Intput stream ignored");
-       
+      if (!args[i+1]) {
+        print_error("Syntax error: no input stream");
+        continue;
+      }
+
+      int fd = open(args[++i], O_RDONLY);
+      if (fd == -1) {
+        print_error("Failed to open input file");
+        print_error(strerror(errno));
+        continue;
+      }
+
+      command->in_fd = fd;
     }
     else if (strcmp(args[i], ">") == 0) {
-      if (!args[i+1]) { print_error("Syntax error: no output stream"); }
-      command->outfile = sf_strdup(args[++i]);
+      if (!args[i+1]) {
+        print_error("Syntax error: no output stream");
+        continue;
+      }
+      int fd = open(args[++i], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+      if (fd == -1) {
+        print_error("Failed to open output file");
+        print_error(strerror(errno));
+        continue;
+      }
+      command->out_fd = fd;
     }
+
     else if (strcmp(args[i], "&") == 0) {
 
       if(!args[i+1]) print_error("Can only use & at the end");
@@ -127,5 +172,3 @@ void final_parser(Command* command, int count, char** args)
   free(tmp_args); 
 
 }
-
-

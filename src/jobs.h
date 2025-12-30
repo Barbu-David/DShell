@@ -17,6 +17,7 @@ typedef enum {
 typedef struct Job{
   Command** commands;
   int command_num;
+  int id;
   bool background;
   pid_t pgid;
   JobState state;
@@ -30,4 +31,3 @@ void free_job(Job* job);
 int launch_job(Job* job, Shell* dshell);
 
 #endif 
-

@@ -4,6 +4,7 @@
 #include "dshell.h"
 #include "commands.h"
 
+#include <errno.h>
 #include "jobs.h"
 
 Job* parse_job(char** raw_args, Shell* dshell);

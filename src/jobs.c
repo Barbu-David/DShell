@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <errno.h>
+#include <stdio.h>
 
 #define MAX_PIPELINE_LENGTH 50
 
@@ -18,6 +22,7 @@ Job* init_job(int commands_num)
   for (int k = 0; k < commands_num; k++) job->commands[k] = NULL;
 
   job->background = false;
+  job->id = 0;
   job->pgid = 0;
   job->state = RUNNING;
   return job;
@@ -98,68 +103,91 @@ Job* build_job(char** raw_args, Shell* dshell)
 
   return job;
 }
-int launch_job(Job* job, Shell* dshell) 
+
+int wait_for_process_group(pid_t pgid)
 {
-    if (!job || job->command_num == 0) return -1;
+  int status;
+  pid_t pid;
+  int all_ok = 1;
 
-    int num_cmds = job->command_num;
-    int pipe_fds[num_cmds - 1][2];
+  for (;;) {
+    pid = waitpid(-pgid, &status, 0);
 
-    // Create the pipes
-    for (int i = 0; i < num_cmds - 1; i++) {
-        if (pipe(pipe_fds[i]) == -1) {
-            print_error("pipe creation failed");
-            return -1;
+    if (pid > 0) {
+      if (WIFEXITED(status)) {
+        if (WEXITSTATUS(status) != 0) {
+          all_ok = -1;
         }
+      } else if (WIFSIGNALED(status)) {
+        all_ok = -1;
+      }
+    } else {
+      if (errno == ECHILD) {
+        /* No more children in this process group */
+        break;
+      } else {
+        /* waitpid failed unexpectedly */
+        all_ok = -1;
+        break;
+      }
     }
+  }
 
-    // Assign infile/outfile for each command (use FD: marker)
-    for (int i = 0; i < num_cmds; i++) {
-        Command* cmd = job->commands[i];
-
-        if (i != 0) {
-            char buf[32];
-            snprintf(buf, sizeof(buf), "FD:%d", pipe_fds[i - 1][0]);
-            cmd->infile = sf_strdup(buf);
-        }
-
-        if (i != num_cmds - 1) {
-            char buf[32];
-            snprintf(buf, sizeof(buf), "FD:%d", pipe_fds[i][1]);
-            cmd->outfile = sf_strdup(buf);
-        }
-    }
-
-    // Execute all commands sequentially but properly close pipe fds in parent
-    for (int i = 0; i < num_cmds; i++) {
-        Command* cmd = job->commands[i];
-        if (cmd->execute) {
-            cmd->execute(cmd, dshell);   // this will fork for external commands
-        }
-
-        // Parent cleanup to avoid holding pipe ends open and causing readers to block:
-        // After launching cmd i:
-        //  - close current write end (pipe_fds[i][1]) in parent so readers see EOF when writers done
-        //  - close previous read end (pipe_fds[i-1][0]) because the reader (i) inherited it
-        if (i != num_cmds - 1) {
-            // close write end of the *current* pipe in parent
-            close(pipe_fds[i][1]);
-        }
-        if (i != 0) {
-            // close read end of the *previous* pipe in parent (reader has been forked)
-            close(pipe_fds[i - 1][0]);
-        }
-    }
-
-    // Any remaining fds (should be none) — but be defensive:
-    for (int i = 0; i < num_cmds - 1; i++) {
-        // these may already be closed; ignore errors
-        close(pipe_fds[i][0]);
-        close(pipe_fds[i][1]);
-    }
-
-    free_job(job);
-
-    return 0;
+  return all_ok;
 }
 
+int launch_job(Job* job, Shell* dshell) 
+{
+  if (!job || job->command_num == 0) return -1;
+
+
+  for (int i = 0; i < job->command_num; i++) {
+    if (job->command_num > 1 && job->commands[i]->parent_only) {
+      print_error("Parent-only command cannot be used in a pipeline");
+      return -1;
+    }
+  }
+
+  int num_cmds = job->command_num;
+  int pipe_fds[num_cmds - 1][2];
+  // Create the pipes
+  for (int i = 0; i < num_cmds - 1; i++) {
+    if (pipe(pipe_fds[i]) == -1) {
+      print_error("pipe creation failed");
+      return -1;
+    }
+  }
+
+
+  for (int i = 0; i < num_cmds; i++) {
+    Command* cmd = job->commands[i];
+
+    if (i != 0) {
+      cmd->in_fd = pipe_fds[i - 1][0];
+    }
+
+    if (i != num_cmds - 1) {
+      cmd->out_fd = pipe_fds[i][1];
+    }
+  }
+
+  for (int i = 0; i < num_cmds; i++) {
+    Command* cmd = job->commands[i];
+
+    launch_command(cmd, dshell);
+
+    if (i != num_cmds - 1) {
+      close(pipe_fds[i][1]);
+    }
+    if (i != 0) {
+      close(pipe_fds[i - 1][0]);
+    }
+  }
+
+  int status = wait_for_process_group(job->pgid);
+
+  remove_job(dshell, job);
+  free_job(job);
+
+  return status;
+}

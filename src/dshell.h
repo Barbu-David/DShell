@@ -3,6 +3,9 @@
 
 #include <stdbool.h>
 
+struct Builtin;
+typedef struct Builtin Builtin;
+
 struct Job;
 typedef struct Job Job;
 
@@ -14,16 +17,20 @@ typedef struct Command Command;
 typedef struct Shell {
     bool running;
     Command* historyCommand;  
-    Job* jobs;
+
+    Job** jobs;
+    int curr_jobs;
+    int job_capacity;   
 
     int num_builtins;
-    char **builtin_str;
-    int (**builtin_func)(Command* command, struct Shell *shell); 
+    Builtin* builtins;
 } Shell;
 
 Shell* shell_init();
 void shell_step(Shell* dshell);
 void shell_close(Shell* dshell);
+void add_job(Shell* dshell, Job* job);
+void remove_job(Shell* dshell, Job* job);
 
 #endif 
 

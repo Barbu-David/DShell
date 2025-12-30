@@ -6,7 +6,6 @@
 #include "line_tokenizer.h"
 #include "builtins.h"
 #include "args.h"
-//#include "background.h"
 #include "sf_wraps.h"
 
 Shell* shell_init() {
@@ -17,19 +16,12 @@ Shell* shell_init() {
 
     dshell->historyCommand = init_command();
     dshell->running = true;
-
-    static char *builtins[] = {"help", "cd", "banner", "!!", "exit"};
-    static int (*funcs[])(Command* command, struct Shell *shell) = {
-        dsh_help,
-        dsh_cd,
-        dsh_banner,
-        dsh_history,
-        dsh_exit
-    };
+    dshell->curr_jobs=0;
+    dshell->job_capacity=50;
+   
+    dshell->jobs= (Job**) sf_malloc(sizeof(Job*) * dshell->job_capacity);
     
-    dshell->num_builtins = 5;
-    dshell->builtin_str = builtins;
-    dshell->builtin_func = funcs;
+    dshell->builtins=init_builtins(&(dshell->num_builtins));
 
     return dshell;
 }
@@ -37,6 +29,7 @@ Shell* shell_init() {
 void shell_close(Shell* dshell) 
 {
   free_command(dshell->historyCommand);
+  free(dshell->jobs);
   free(dshell);
 }
 
@@ -47,13 +40,37 @@ void shell_step(Shell* dshell)
   char* line = read_line();
   char** args = tokenize_line(line);
   Job* job = build_job(args, dshell);
+
+  add_job(dshell, job);
   
   int status = launch_job(job, dshell);
 
   if(status == -1) print_error("Failed to execute program");
 
- // if(dshell->background_process) reap_background_process(dshell); 
-
- // if(command->to_history) copy_command(command, dshell->historyCommand);
   free(line);
 }
+
+void add_job(Shell* dshell, Job* job)
+{
+
+  if(dshell->curr_jobs >= dshell->job_capacity) return; // TO DO add reallocation
+  job->id=dshell->curr_jobs;
+  for(int i=0; i<job->command_num; i++) job->commands[i]->job_id=job->id;
+
+  dshell->jobs[dshell->curr_jobs++]=job;
+
+}
+
+void remove_job(Shell* dshell, Job* job)
+{
+    if (!dshell || !job) return;
+    int idx = job->id;
+
+    if (idx < 0 || idx >= dshell->curr_jobs) return;
+
+    dshell->curr_jobs--; 
+    dshell->jobs[idx] = dshell->jobs[dshell->curr_jobs]; 
+    if (dshell->jobs[idx]) dshell->jobs[idx]->id = idx;    
+    dshell->jobs[dshell->curr_jobs] = NULL;
+}
+

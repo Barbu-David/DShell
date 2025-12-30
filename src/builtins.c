@@ -34,7 +34,7 @@ int dsh_help(Command* command, Shell* dshell)
   (void) dshell;
   (void) command;
   printf("Hello, this is dshell. It has the following builtins:\n");
-  for(int i=0; i< dshell->num_builtins; i++) printf("%s\n", dshell->builtin_str[i]);
+  for(int i=0; i< dshell->num_builtins; i++) printf("%s\n", dshell->builtins[i].str);
   printf("Type program names and arguments, and hit enter.\n");
   return 0;
 
@@ -42,13 +42,15 @@ int dsh_help(Command* command, Shell* dshell)
 
 int dsh_exit(Command* command, Shell* dshell)
 {
-  command->to_history=false;
+  (void) command;
   dshell->running=false;
   return 0;
 }
 
 int dsh_history(Command* command, Shell* dshell)
 {
+
+  (void) command;
 
   if (!dshell->historyCommand ||
       !dshell->historyCommand->args ||
@@ -58,7 +60,20 @@ int dsh_history(Command* command, Shell* dshell)
     return 0;
   }
 
-  command->to_history = false;
-
   return dshell->historyCommand->execute(dshell->historyCommand, dshell);
+}
+
+Builtin* init_builtins(int* num_builtins)
+{
+    static Builtin builtins_list[] = {
+        {"help",    false, dsh_help},
+        {"cd",      true,  dsh_cd},       // parent only
+        {"banner",  false, dsh_banner},
+        {"!!",      false, dsh_history},
+        {"exit",    true,  dsh_exit}      // parent only
+    };
+
+    *num_builtins = sizeof(builtins_list) / sizeof(Builtin);
+
+    return builtins_list;
 }
