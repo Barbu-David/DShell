@@ -78,9 +78,6 @@ void only_parser(Command* command, int count, char** args)
       }
       command->out_fd = fd;
     }
-    else if (strcmp(args[i], "&") == 0) {
-      if (!args[i+1]) print_error("Can only use & at the end");
-    }
     else {
       tmp_args[j++] = args[i];
     }

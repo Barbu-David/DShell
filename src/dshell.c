@@ -1,4 +1,7 @@
 #include <stdlib.h>
+#include <errno.h>
+#include <string.h>
+
 
 #include "dshell.h"
 #include "ui.h"
@@ -44,8 +47,7 @@ void shell_step(Shell* dshell)
   add_job(dshell, job);
   
   int status = launch_job(job, dshell);
-
-  if(status == -1) print_error("Failed to execute program");
+ if(status == -1 && line != NULL && job && !job->background) print_error("Failed to execute program");
 
   free(line);
 }
@@ -53,7 +55,7 @@ void shell_step(Shell* dshell)
 void add_job(Shell* dshell, Job* job)
 {
 
-  if(dshell->curr_jobs >= dshell->job_capacity) return; // TO DO add reallocation
+  if(dshell->curr_jobs >= dshell->job_capacity || !job) return; // TO DO add reallocation
   job->id=dshell->curr_jobs;
   for(int i=0; i<job->command_num; i++) job->commands[i]->job_id=job->id;
 
@@ -72,5 +74,47 @@ void remove_job(Shell* dshell, Job* job)
     dshell->jobs[idx] = dshell->jobs[dshell->curr_jobs]; 
     if (dshell->jobs[idx]) dshell->jobs[idx]->id = idx;    
     dshell->jobs[dshell->curr_jobs] = NULL;
+}
+
+void reap_background_jobs(struct Shell *dshell) {
+    if (dshell == NULL) return;
+
+    for (int i = 0; i < dshell->curr_jobs;) {
+        Job *job = dshell->jobs[i];
+        if (job == NULL) {
+            i++;
+            continue;
+        }
+
+        if (!job->background) {
+            i++;
+            continue;
+        }
+
+        int status;
+        pid_t w;
+
+        while ((w = waitpid(-job->pgid, &status, WNOHANG)) > 0) {
+            (void) status; 
+        }
+        if (w == 0) {
+            i++;
+            continue;
+        } else {
+            if (errno == ECHILD) {
+
+                remove_job(dshell, job);
+                free_job(job);
+
+                continue;
+            } else {
+                
+                print_error("waitpid(-pgid, WNOHANG) failed");
+                print_error(strerror(errno));
+                i++;
+                continue;
+            }
+        }
+    }
 }
 

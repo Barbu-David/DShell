@@ -88,36 +88,58 @@ void child(Command* command, Shell* dshell)
     command->out_fd = -1;
   }
 
-  command->execute(command, dshell);
-
-     int ret = command->execute(command, dshell);
-    _exit(ret >= 0 ? ret : 127);
+  int ret = command->execute(command, dshell);
+  _exit(ret >= 0 ? ret : 127);
 }
 
 void launch_command(Command* command, Shell* dshell)
 {
-
   if (command->parent_only) {
     command->execute(command, dshell);
     return;
   }
 
-  pid_t pid;
+  pid_t pid = fork();
 
-  pid = fork();
-
-  if(pid<0) {
+  if (pid < 0) {
     print_error("Fork failed");
     print_error(strerror(errno));
+    return;
   }
 
-  if(pid==0) child(command, dshell); 
+  if (pid == 0) {
+    if (setpgid(0, 0) < 0) {
+      print_error("child: setpgid(0,0) failed");
+      print_error(strerror(errno));
+    }
+    child(command, dshell);
+  }
 
-  if(!dshell->jobs[command->job_id]->pgid) dshell->jobs[command->job_id]->pgid = pid;
+  if (pid == 0) {
+    pid_t cpid = getpid();
+    pid_t pgid = dshell->jobs[command->job_id]->pgid;
+    if (pgid == 0) pgid = cpid;  
+    setpgid(0, pgid);           
+    child(command, dshell);      
+  }
 
-  setpgid(pid, dshell->jobs[command->job_id]->pgid);
+  Job *job = dshell->jobs[command->job_id];
+  if (!job) return;
 
+  if (job->pgid == 0) {
+    job->pgid = pid;
+    if (setpgid(pid, pid) < 0 && errno != EACCES && errno != ESRCH) {
+      print_error("parent: setpgid(pid,pid) failed");
+      print_error(strerror(errno));
+    }
+  } else {
+    if (setpgid(pid, job->pgid) < 0 && errno != EACCES && errno != ESRCH) {
+      print_error("parent: setpgid(pid,job->pgid) failed");
+      print_error(strerror(errno));
+    }
+  }
 }
+
 
 void assign_executor(const char* c, Shell* dshell, Command* command)
 {
