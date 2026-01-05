@@ -19,6 +19,7 @@ typedef struct Job{
   int command_num;
   int id;
   bool background;
+  bool history;
   pid_t pgid;
   JobState state;
 } Job;
@@ -26,6 +27,7 @@ typedef struct Job{
 
 Job* init_job(int commands_num);
 Job* build_job(char** raw_args, Shell* dshell);
+void copy_job(Job* src_job, Job* dst_job);
 void free_job(Job* job);
 
 int launch_job(Job* job, Shell* dshell);

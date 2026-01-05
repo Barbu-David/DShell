@@ -9,7 +9,7 @@
 void print_error(const char* error)
 {
   fprintf(stderr, "%s%s%s\n", RED, error, RESET_COLOR);
-  fflush(stdout);
+  fflush(stderr);
 }
 
 void print_shell_prompt(void) 

@@ -4,6 +4,7 @@
 #include "dshell.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <sys/types.h>
 
 typedef struct Command{
     char** args;              
@@ -16,8 +17,7 @@ typedef struct Command{
 
 Command* init_command();
 Command* build_command(char** raw_args, Shell* dshell, void (*parser) (Command*, int, char**));
-void launch_command(Command* command, Shell* dshell);
+pid_t launch_command(Command* command, Shell* dshell);
 void copy_command(Command* src, Command* dst);
 void free_command(Command* c);
-
 #endif 

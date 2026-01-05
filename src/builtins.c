@@ -50,27 +50,34 @@ int dsh_exit(Command* command, Shell* dshell)
 int dsh_history(Command* command, Shell* dshell)
 {
 
-  (void) command;
+  dshell->jobs[command->job_id]->history=false;
 
-  if (!dshell->historyCommand ||
-      !dshell->historyCommand->args ||
-      dshell->historyCommand->args[0] == NULL ||
-      dshell->historyCommand->execute == NULL) {
+  if (!dshell->lastJob || dshell->lastJob->command_num == 0) {
     print_error("Empty history");
     return 0;
   }
 
-  return dshell->historyCommand->execute(dshell->historyCommand, dshell);
+  Job* job = clone_job(dshell->lastJob);
+  if (!job) {
+    print_error("Failed to clone history");
+    return 1;
+  }
+
+  add_job(dshell, job);
+
+  int status = launch_job(job, dshell);
+  return status;
 }
+
 
 Builtin* init_builtins(int* num_builtins)
 {
     static Builtin builtins_list[] = {
         {"help",    false, dsh_help},
-        {"cd",      true,  dsh_cd},       // parent only
+        {"cd",      true,  dsh_cd},       
         {"banner",  false, dsh_banner},
-        {"!!",      false, dsh_history},
-        {"exit",    true,  dsh_exit}      // parent only
+        {"!!",      true, dsh_history},
+        {"exit",    true,  dsh_exit}      
     };
 
     *num_builtins = sizeof(builtins_list) / sizeof(Builtin);

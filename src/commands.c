@@ -13,6 +13,30 @@
 #include <stdlib.h>
 #include "builtins.h"
 
+
+int external_cmd_execute(Command* command, Shell* dshell)
+{
+    (void) dshell;
+    execvp(command->args[0], command->args);
+
+    // Only reached if execvp failed:
+    print_error(strerror(errno));
+    print_error("Failed to start program external_cmd_execute");
+    return 127;   // conventional exit code for "command not found / exec failed"
+}
+
+void assign_executor(const char* c, Shell* dshell, Command* command)
+{
+  for (int i = 0; i < dshell->num_builtins; i++) 
+    if (strcmp(c, dshell->builtins[i].str) == 0) {
+      command->execute = dshell->builtins[i].func;
+      command->parent_only=dshell->builtins[i].parent_only;
+      return;
+    }
+  command->execute =external_cmd_execute;
+}
+
+
 void free_command(Command* c)
 {
   free_args(c->args);
@@ -43,24 +67,15 @@ void copy_command(Command* src, Command* dst)
   }
 
   dst->parent_only  = src->parent_only;
-  dst->execute     = src->execute;
 
-  dst->in_fd = src->in_fd;
-  dst->out_fd = src->out_fd;
+  dst->in_fd = -1;
+  dst->out_fd = -1;
+
 
   dst->args = copy_args(src->args);
-}
 
-int external_cmd_execute(Command* command, Shell* dshell)
-{
-  (void) dshell;
-  if (execvp(command->args[0], command->args) == -1) {
-    print_error(strerror(errno));
-    print_error("Failed to start program");
-  }
-  return -1;
+  dst->execute = src->execute;
 }
-
 void child(Command* command, Shell* dshell) 
 {
   if (!command || !command->args || !command->args[0]) {
@@ -89,67 +104,49 @@ void child(Command* command, Shell* dshell)
   }
 
   int ret = command->execute(command, dshell);
-  _exit(ret >= 0 ? ret : 127);
+  _exit(ret);
 }
 
-void launch_command(Command* command, Shell* dshell)
+
+
+pid_t launch_command(Command* command, Shell* dshell)
 {
-  if (command->parent_only) {
-    command->execute(command, dshell);
-    return;
-  }
-
-  pid_t pid = fork();
-
-  if (pid < 0) {
-    print_error("Fork failed");
-    print_error(strerror(errno));
-    return;
-  }
-
-  if (pid == 0) {
-    if (setpgid(0, 0) < 0) {
-      print_error("child: setpgid(0,0) failed");
-      print_error(strerror(errno));
+    if (command->parent_only) {
+        command->execute(command, dshell);
+        return 0;
     }
-    child(command, dshell);
-  }
 
-  if (pid == 0) {
-    pid_t cpid = getpid();
-    pid_t pgid = dshell->jobs[command->job_id]->pgid;
-    if (pgid == 0) pgid = cpid;  
-    setpgid(0, pgid);           
-    child(command, dshell);      
-  }
-
-  Job *job = dshell->jobs[command->job_id];
-  if (!job) return;
-
-  if (job->pgid == 0) {
-    job->pgid = pid;
-    if (setpgid(pid, pid) < 0 && errno != EACCES && errno != ESRCH) {
-      print_error("parent: setpgid(pid,pid) failed");
-      print_error(strerror(errno));
+    pid_t pid = fork();
+    if (pid < 0) {
+        print_error("Fork failed");
+        print_error(strerror(errno));
+        return -1;
     }
-  } else {
+
+    if (pid == 0) {
+        if (setpgid(0, 0) < 0) {
+            print_error("child: setpgid(0,0) failed");
+            print_error(strerror(errno));
+        }
+        child(command, dshell);
+        _exit(127);
+    }
+
+    Job *job = dshell->jobs[command->job_id];
+    if (!job) {
+        return pid;
+    }
+
+    if (job->pgid == 0) {
+        job->pgid = pid;
+    }
+
     if (setpgid(pid, job->pgid) < 0 && errno != EACCES && errno != ESRCH) {
-      print_error("parent: setpgid(pid,job->pgid) failed");
-      print_error(strerror(errno));
+        print_error("parent: setpgid(pid, job->pgid) failed");
+        print_error(strerror(errno));
     }
-  }
-}
 
-
-void assign_executor(const char* c, Shell* dshell, Command* command)
-{
-  for (int i = 0; i < dshell->num_builtins; i++) 
-    if (strcmp(c, dshell->builtins[i].str) == 0) {
-      command->execute = dshell->builtins[i].func;
-      command->parent_only=dshell->builtins[i].parent_only;
-      return;
-    }
-  command->execute =external_cmd_execute;
+    return pid;
 }
 
 Command* build_command(char** raw_args, Shell* dshell, void (*parser) (Command*, int, char**)) 

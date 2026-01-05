@@ -19,7 +19,7 @@ Shell* shell_init() {
 
   Shell* dshell = (Shell*) sf_malloc(sizeof(Shell));
 
-  dshell->historyCommand = init_command();
+  dshell->lastJob = init_job(0);
   dshell->running = true;
   dshell->curr_jobs=0;
   dshell->job_capacity=50;
@@ -33,8 +33,8 @@ Shell* shell_init() {
 
 void shell_close(Shell* dshell) 
 {
-  free_command(dshell->historyCommand);
- 
+  free_job(dshell->lastJob);
+
   if (dshell->jobs) {
     for (int i = 0; i < dshell->curr_jobs; i++) {
       Job* job = dshell->jobs[i];
@@ -53,21 +53,42 @@ void shell_close(Shell* dshell)
 
 void shell_step(Shell* dshell) 
 {
-  print_shell_prompt();
+    print_shell_prompt();
 
-  char* line = read_line();
-  char** args = tokenize_line(line);
-  Job* job = build_job(args, dshell);
+    char* line = read_line();
+    char** args = tokenize_line(line);
+    Job* job = build_job(args, dshell);
 
-  add_job(dshell, job);
+    if (!job) {
+        free(line);
+        return;
+    }
 
-  int status = launch_job(job, dshell);
-  if(status == -1 && line != NULL && job && !job->background) {
-    print_error("Failed to execute program");
-    remove_job(dshell, job);
-    free_job(job);
-  }
-  free(line);
+    add_job(dshell, job);
+
+    int status = launch_job(job, dshell);
+
+    if (status == -1 && job && !job->background && job->pgid > 0) {
+        print_error("Failed to execute program shell");
+        remove_job(dshell, job);
+        free_job(job);
+        job = NULL;
+    }
+
+    if (job && job->history) {
+        bool all_ok = true;
+        for (int i = 0; i < job->command_num; i++) {
+            Command* c = job->commands[i];
+            if (!c || !c->args || !c->args[0]) { all_ok = false; break; }
+        }
+        if (all_ok) {
+            copy_job(job, dshell->lastJob);
+            dshell->lastJob->history = true;
+        }
+    }
+
+    reap_background_jobs(dshell);
+    free(line);
 }
 
 void add_job(Shell* dshell, Job* job)
@@ -135,3 +156,9 @@ void reap_background_jobs(struct Shell *dshell) {
 }
 
 
+Job* clone_job(const Job* src) {
+  if (!src) return NULL;
+  Job* dst = init_job(src->command_num);
+  copy_job((Job*)src, dst);
+  return dst;
+}
