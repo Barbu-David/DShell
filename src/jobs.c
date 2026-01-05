@@ -150,7 +150,7 @@ int launch_job(Job* job, Shell* dshell)
 
   int num_cmds = job->command_num;
   int pipe_fds[num_cmds - 1][2];
-  // Create the pipes
+
   for (int i = 0; i < num_cmds - 1; i++) {
     if (pipe(pipe_fds[i]) == -1) {
       print_error("pipe creation failed");
@@ -187,10 +187,7 @@ int launch_job(Job* job, Shell* dshell)
   if (!job->background) {
 
     int status = wait_for_process_group(job->pgid);
-
-    remove_job(dshell, job);
-    free_job(job);
-
+    job->state = DONE;
     return status;
   }
 
