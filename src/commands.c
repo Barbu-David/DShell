@@ -107,9 +107,7 @@ void child(Command* command, Shell* dshell)
   _exit(ret);
 }
 
-
-
-pid_t launch_command(Command* command, Shell* dshell)
+pid_t launch_command(Command* command, Shell* dshell, int (*pipe_fds)[2], int num_pipes)
 {
     if (command->parent_only) {
         command->execute(command, dshell);
@@ -124,28 +122,36 @@ pid_t launch_command(Command* command, Shell* dshell)
     }
 
     if (pid == 0) {
+        /* CHILD */
+        /* Put child in its own process group (typical pattern) */
         if (setpgid(0, 0) < 0) {
+            /* non-fatal: we still try to run the child */
             print_error("child: setpgid(0,0) failed");
             print_error(strerror(errno));
         }
+
+        /* Close *all* pipe fds that this child does not need.
+           pipe_fds may be NULL if num_pipes == 0 (single command). */
+        if (pipe_fds != NULL && num_pipes > 0) {
+            for (int p = 0; p < num_pipes; ++p) {
+                int rfd = pipe_fds[p][0];
+                int wfd = pipe_fds[p][1];
+
+                if (rfd != -1 && rfd != command->in_fd) {
+                    close(rfd);
+                }
+                if (wfd != -1 && wfd != command->out_fd) {
+                    close(wfd);
+                }
+            }
+        }
+
+        /* Now let child() perform dup2 of its in/out fds and exec */
         child(command, dshell);
-        _exit(127);
+        _exit(127); /* should not be reached */
     }
 
-    Job *job = dshell->jobs[command->job_id];
-    if (!job) {
-        return pid;
-    }
-
-    if (job->pgid == 0) {
-        job->pgid = pid;
-    }
-
-    if (setpgid(pid, job->pgid) < 0 && errno != EACCES && errno != ESRCH) {
-        print_error("parent: setpgid(pid, job->pgid) failed");
-        print_error(strerror(errno));
-    }
-
+    /* PARENT */
     return pid;
 }
 

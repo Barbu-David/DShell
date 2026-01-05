@@ -15,15 +15,17 @@ typedef struct Command Command;
 #define MAX_JOBS 50
 
 typedef struct Shell {
-    bool running;
-    Job* lastJob;  
 
-    Job** jobs;
-    int curr_jobs;
-    int job_capacity;   
+  bool running;
+  Job* lastJob;  
 
-    int num_builtins;
-    Builtin* builtins;
+  Job** jobs;
+  int curr_jobs;
+  int job_capacity;   
+
+  int num_builtins;
+  Builtin* builtins;
+
 } Shell;
 
 Shell* shell_init();

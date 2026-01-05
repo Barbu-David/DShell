@@ -28,7 +28,7 @@ void first_parser(Command* command, int count, char** args)
     }
     else if (strcmp(args[i], ">") == 0) {
       if (args[i+1]) i++;
-      print_error("Can't redirect output at the beggining of the pipeline. Output stream ignored");
+      print_error("Can't redirect output at the beginning of the pipeline. Output stream ignored");
     }
     else if (strcmp(args[i], "&") == 0) {
       print_error("Can only use & at the end");

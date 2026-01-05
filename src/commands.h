@@ -17,7 +17,7 @@ typedef struct Command{
 
 Command* init_command();
 Command* build_command(char** raw_args, Shell* dshell, void (*parser) (Command*, int, char**));
-pid_t launch_command(Command* command, Shell* dshell);
+pid_t launch_command(Command* command, Shell* dshell, int (*pipe_fds)[2], int num_pipes);
 void copy_command(Command* src, Command* dst);
 void free_command(Command* c);
 #endif 

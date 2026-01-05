@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 #include "jobs.h"
 #include "sf_wraps.h"
 #include "args.h"
@@ -10,6 +11,9 @@
 #include <sys/wait.h>
 #include <errno.h>
 #include <stdio.h>
+
+#include <signal.h>
+
 
 #define MAX_PIPELINE_LENGTH 50
 
@@ -171,6 +175,7 @@ int wait_for_process_group(pid_t pgid)
 
   return all_ok;
 }
+
 int launch_job(Job* job, Shell* dshell)
 {
   if (!job || job->command_num == 0) return -1;
@@ -183,11 +188,28 @@ int launch_job(Job* job, Shell* dshell)
   }
 
   int num_cmds = job->command_num;
-  int pipe_fds[num_cmds - 1][2];
+  int num_pipes = (num_cmds > 1) ? (num_cmds - 1) : 0;
 
-  for (int i = 0; i < num_cmds - 1; i++) {
-    if (pipe(pipe_fds[i]) == -1) {
+  int (*pipe_fds)[2] = NULL;
+  if (num_pipes > 0) {
+    pipe_fds = sf_malloc(sizeof(int[2]) * num_pipes);
+    /* initialize to -1 for safe closing on cleanup */
+    for (int p = 0; p < num_pipes; ++p) {
+      pipe_fds[p][0] = -1;
+      pipe_fds[p][1] = -1;
+    }
+  }
+
+  /* create pipes */
+  for (int p = 0; p < num_pipes; ++p) {
+    if (pipe(pipe_fds[p]) == -1) {
       print_error("pipe creation failed");
+      /* cleanup already-created pipes */
+      for (int q = 0; q < p; ++q) {
+        if (pipe_fds[q][0] != -1) close(pipe_fds[q][0]);
+        if (pipe_fds[q][1] != -1) close(pipe_fds[q][1]);
+      }
+      free(pipe_fds);
       return -1;
     }
   }
@@ -198,24 +220,33 @@ int launch_job(Job* job, Shell* dshell)
   for (int i = 0; i < num_cmds; i++) {
     Command* cmd = job->commands[i];
 
-    if(!cmd) continue;
+    if (!cmd) continue;
+
+    /* assign the intended in/out fds for this command */
     if (!cmd->parent_only) {
       if (i != 0) cmd->in_fd = pipe_fds[i - 1][0];
       if (i != num_cmds - 1) cmd->out_fd = pipe_fds[i][1];
     }
 
-    // Launch command
-    pid_t pid = launch_command(cmd, dshell);
+    /* Launch command - pass pipe_fds so child can close unrelated fds */
+    pid_t pid = launch_command(cmd, dshell, pipe_fds, num_pipes);
 
     if (pid < 0) {
       print_error("Failed to fork command");
+      /* On error: close all pipe fds and free */
+      if (pipe_fds) {
+        for (int p = 0; p < num_pipes; ++p) {
+          if (pipe_fds[p][0] != -1) { close(pipe_fds[p][0]); pipe_fds[p][0] = -1; }
+          if (pipe_fds[p][1] != -1) { close(pipe_fds[p][1]); pipe_fds[p][1] = -1; }
+        }
+        free(pipe_fds);
+      }
       return -1;
     }
 
-    if (pid > 0) { // child process
+    if (pid > 0) { /* parent: record that a real child was spawned */
       any_child_spawned = 1;
 
-      // Set job pgid from first real child
       if (job->pgid == 0) {
         job->pgid = pid;
         if (setpgid(pid, job->pgid) < 0 && errno != EACCES && errno != ESRCH) {
@@ -228,12 +259,27 @@ int launch_job(Job* job, Shell* dshell)
       }
     }
 
-    // Close unused pipes in parent immediately
-    if (i != 0 && !cmd->parent_only) close(pipe_fds[i - 1][0]);
-    if (i != num_cmds - 1 && !cmd->parent_only) close(pipe_fds[i][1]);
+    /* Parent closes ends it doesn't need anymore (standard pipeline pattern) */
+    if (i != 0) {
+      /* after forking command i, parent no longer needs the read end of pipe i-1 */
+      if (pipe_fds[i - 1][0] != -1) { close(pipe_fds[i - 1][0]); pipe_fds[i - 1][0] = -1; }
+    }
+    if (i != num_cmds - 1) {
+      /* parent no longer needs the write end of pipe i */
+      if (pipe_fds[i][1] != -1) { close(pipe_fds[i][1]); pipe_fds[i][1] = -1; }
+    }
   }
 
-  // All commands were parent-only?
+  /* cleanup: ensure any remaining fds are closed */
+  if (pipe_fds) {
+    for (int p = 0; p < num_pipes; ++p) {
+      if (pipe_fds[p][0] != -1) { close(pipe_fds[p][0]); pipe_fds[p][0] = -1; }
+      if (pipe_fds[p][1] != -1) { close(pipe_fds[p][1]); pipe_fds[p][1] = -1; }
+    }
+    free(pipe_fds);
+  }
+
+  /* All commands were parent-only? */
   if (!any_child_spawned) {
     job->state = DONE;
     return 0;
@@ -249,6 +295,21 @@ int launch_job(Job* job, Shell* dshell)
     return status;
   }
 
-  return 0; 
+  return 0;
 }
 
+void kill_job_list(Job** jobs, int jobs_num)
+{
+  if (!jobs) return;
+
+  for (int i = 0; i < jobs_num; i++) {
+    if (jobs[i]) {
+      if (jobs[i]->pgid > 0) {
+        kill(-jobs[i]->pgid, SIGKILL);
+        waitpid(-jobs[i]->pgid, NULL, 0); 
+      }
+      free_job(jobs[i]);
+    }
+  }
+  free(jobs);
+}

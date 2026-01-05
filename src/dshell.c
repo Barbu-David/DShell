@@ -1,10 +1,6 @@
-#define _POSIX_C_SOURCE 200809L
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include <signal.h>
-
-
 #include "dshell.h"
 #include "ui.h"
 #include "read_write.h"
@@ -19,13 +15,12 @@ Shell* shell_init() {
 
   Shell* dshell = (Shell*) sf_malloc(sizeof(Shell));
 
-  dshell->lastJob = init_job(0);
   dshell->running = true;
   dshell->curr_jobs=0;
-  dshell->job_capacity=50;
+  dshell->job_capacity=MAX_JOBS;
 
-  dshell->jobs= (Job**) sf_malloc(sizeof(Job*) * dshell->job_capacity);
-
+  dshell->lastJob = init_job(0);
+  dshell->jobs = (Job**) sf_malloc(sizeof(Job*) * dshell->job_capacity);
   dshell->builtins=init_builtins(&(dshell->num_builtins));
 
   return dshell;
@@ -34,20 +29,7 @@ Shell* shell_init() {
 void shell_close(Shell* dshell) 
 {
   free_job(dshell->lastJob);
-
-  if (dshell->jobs) {
-    for (int i = 0; i < dshell->curr_jobs; i++) {
-      Job* job = dshell->jobs[i];
-      if (job) {
-        if (job->pgid > 0) {
-          kill(-job->pgid, SIGKILL);
-          waitpid(-job->pgid, NULL, 0);  // reap immediately
-        }
-        free_job(job);
-      }
-    }
-    free(dshell->jobs);
-  }
+  kill_job_list(dshell->jobs, dshell->curr_jobs);
   free(dshell);
 }
 
@@ -59,16 +41,11 @@ void shell_step(Shell* dshell)
     char** args = tokenize_line(line);
     Job* job = build_job(args, dshell);
 
-    if (!job) {
-        free(line);
-        return;
-    }
-
     add_job(dshell, job);
 
     int status = launch_job(job, dshell);
 
-    if (status == -1 && job && !job->background && job->pgid > 0) {
+    if (status == -1 && job) {
         print_error("Failed to execute program shell");
         remove_job(dshell, job);
         free_job(job);
@@ -76,15 +53,8 @@ void shell_step(Shell* dshell)
     }
 
     if (job && job->history) {
-        bool all_ok = true;
-        for (int i = 0; i < job->command_num; i++) {
-            Command* c = job->commands[i];
-            if (!c || !c->args || !c->args[0]) { all_ok = false; break; }
-        }
-        if (all_ok) {
-            copy_job(job, dshell->lastJob);
-            dshell->lastJob->history = true;
-        }
+      copy_job(job, dshell->lastJob);
+      dshell->lastJob->history = true;
     }
 
     reap_background_jobs(dshell);
@@ -94,7 +64,9 @@ void shell_step(Shell* dshell)
 void add_job(Shell* dshell, Job* job)
 {
 
-  if(dshell->curr_jobs >= dshell->job_capacity || !job) return; // TO DO add reallocation
+  if(!job) return;
+
+  if(dshell->curr_jobs >= dshell->job_capacity || !job) return; 
   job->id=dshell->curr_jobs;
   for(int i=0; i<job->command_num; i++) job->commands[i]->job_id=job->id;
 
