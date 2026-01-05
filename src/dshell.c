@@ -33,32 +33,36 @@ void shell_close(Shell* dshell)
   free(dshell);
 }
 
+void shell_error(Shell* dshell, Job* job)
+{
+  if(!job) return;
+  print_error("Failed to execute program shell");
+  remove_job(dshell, job);
+  free_job(job);
+  job = NULL;
+}
+
 void shell_step(Shell* dshell) 
 {
-    print_shell_prompt();
+  print_shell_prompt();
 
-    char* line = read_line();
-    char** args = tokenize_line(line);
-    Job* job = build_job(args, dshell);
+  char* line = read_line();
+  char** args = tokenize_line(line);
+  Job* job = build_job(args, dshell);
 
-    add_job(dshell, job);
+  add_job(dshell, job);
 
-    int status = launch_job(job, dshell);
+  int status = launch_job(job, dshell);
 
-    if (status == -1 && job) {
-        print_error("Failed to execute program shell");
-        remove_job(dshell, job);
-        free_job(job);
-        job = NULL;
-    }
+  if (status == -1) shell_error(dshell, job);
 
-    if (job && job->history) {
-      copy_job(job, dshell->lastJob);
-      dshell->lastJob->history = true;
-    }
+  if (job && job->history) {
+    copy_job(job, dshell->lastJob);
+    dshell->lastJob->history = true;
+  }
 
-    reap_background_jobs(dshell);
-    free(line);
+  reap_background_jobs(dshell);
+  free(line);
 }
 
 void add_job(Shell* dshell, Job* job)
