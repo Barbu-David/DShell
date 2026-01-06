@@ -229,126 +229,127 @@ static int (*allocate_pipes(int num_pipes))[2] {
     return fds;
 }
 
+static int validate_pipeline(Job *job)
+{
+    if (!job || job->command_num == 0)
+        return -1;
+
+    if (job->command_num > 1) {
+        for (int i = 0; i < job->command_num; i++) {
+            if (job->commands[i]->parent_only) {
+                print_error("Parent-only command cannot be used in a pipeline");
+                return -1;
+            }
+        }
+    }
+    return 0;
+}
+
+static int handle_fork_result(pid_t pid, Job *job, int (*pipe_fds)[2], int num_pipes, int *any_child_spawned)
+{
+    if (pid < 0) {
+        print_error("Failed to fork command");
+        close_pipes(pipe_fds, num_pipes);
+        free(pipe_fds);
+        return -1;
+    }
+
+    if (pid > 0) {
+        *any_child_spawned = 1;
+
+        if (job->pgid == 0) {
+            job->pgid = pid;
+            if (setpgid(pid, job->pgid) < 0 &&
+                errno != EACCES && errno != ESRCH) {
+                print_error("parent: setpgid failed");
+            }
+        } else {
+            if (setpgid(pid, job->pgid) < 0 &&
+                errno != EACCES && errno != ESRCH) {
+                print_error("parent: join pgid failed");
+            }
+        }
+    }
+
+    return 0;
+}
+
+
+static void setup_command_pipeline(Command *cmd, int (*pipe_fds)[2], int i, int num_cmds)
+{
+    if (cmd->parent_only || !pipe_fds)
+        return;
+
+    if (i != 0)
+        cmd->in_fd = pipe_fds[i - 1][0];
+    if (i != num_cmds - 1)
+        cmd->out_fd = pipe_fds[i][1];
+}
+
+
+static void parent_close_unused_pipes(int (*pipe_fds)[2], int i, int num_cmds)
+{
+    if (!pipe_fds)
+        return;
+
+    if (i != 0 && pipe_fds[i - 1][0] != -1) {
+        close(pipe_fds[i - 1][0]);
+        pipe_fds[i - 1][0] = -1;
+    }
+
+    if (i != num_cmds - 1 && pipe_fds[i][1] != -1) {
+        close(pipe_fds[i][1]);
+        pipe_fds[i][1] = -1;
+    }
+}
+
+static int finalize_job(Job *job, int any_child_spawned)
+{
+    if (!any_child_spawned) {
+        job->state = DONE;
+        return 0;
+    }
+
+    if (!job->background) {
+        int status = wait_for_process_group(job->pgid);
+        job->state = DONE;
+        return status;
+    }
+
+    return 0;
+}
+
 int launch_job(Job* job, Shell* dshell)
 {
-  if (!job || job->command_num == 0) return -1;
+    if (validate_pipeline(job) < 0)
+        return -1;
 
-  for (int i = 0; i < job->command_num; i++) {
-    if (job->command_num > 1 && job->commands[i]->parent_only) {
-      print_error("Parent-only command cannot be used in a pipeline");
-      return -1;
-    }
-  }
+    int num_cmds = job->command_num;
+    int num_pipes = (num_cmds > 1) ? (num_cmds - 1) : 0;
 
-  int num_cmds = job->command_num;
-  int num_pipes = (num_cmds > 1) ? (num_cmds - 1) : 0;
+    int (*pipe_fds)[2] = allocate_pipes(num_pipes);
+    if (!pipe_fds && num_pipes) return -1;
 
-  int (*pipe_fds)[2] = NULL;
-  if (num_pipes > 0) {
-    pipe_fds = sf_malloc(sizeof(int[2]) * num_pipes);
-    /* initialize to -1 for safe closing on cleanup */
-    for (int p = 0; p < num_pipes; ++p) {
-      pipe_fds[p][0] = -1;
-      pipe_fds[p][1] = -1;
-    }
-  }
+    job->pgid = 0;
+    int any_child_spawned = 0;
 
-  /* create pipes */
-  for (int p = 0; p < num_pipes; ++p) {
-    if (pipe(pipe_fds[p]) == -1) {
-      print_error("pipe creation failed");
-      /* cleanup already-created pipes */
-      for (int q = 0; q < p; ++q) {
-        if (pipe_fds[q][0] != -1) close(pipe_fds[q][0]);
-        if (pipe_fds[q][1] != -1) close(pipe_fds[q][1]);
-      }
-      free(pipe_fds);
-      return -1;
-    }
-  }
+    for (int i = 0; i < num_cmds; i++) {
+        Command* cmd = job->commands[i];
+        if (!cmd) continue;
 
-  job->pgid = 0;
-  int any_child_spawned = 0;
+        setup_command_pipeline(cmd, pipe_fds, i, num_cmds);
 
-  for (int i = 0; i < num_cmds; i++) {
-    Command* cmd = job->commands[i];
+        pid_t pid = launch_command(cmd, dshell, pipe_fds, num_pipes);
+        if (handle_fork_result(pid, job, pipe_fds, num_pipes, &any_child_spawned) < 0)
+            return -1;
 
-    if (!cmd) continue;
-
-    /* assign the intended in/out fds for this command */
-    if (!cmd->parent_only) {
-      if (i != 0) cmd->in_fd = pipe_fds[i - 1][0];
-      if (i != num_cmds - 1) cmd->out_fd = pipe_fds[i][1];
+        parent_close_unused_pipes(pipe_fds, i, num_cmds);
     }
 
-    /* Launch command - pass pipe_fds so child can close unrelated fds */
-    pid_t pid = launch_command(cmd, dshell, pipe_fds, num_pipes);
-
-    if (pid < 0) {
-      print_error("Failed to fork command");
-      /* On error: close all pipe fds and free */
-      if (pipe_fds) {
-        for (int p = 0; p < num_pipes; ++p) {
-          if (pipe_fds[p][0] != -1) { close(pipe_fds[p][0]); pipe_fds[p][0] = -1; }
-          if (pipe_fds[p][1] != -1) { close(pipe_fds[p][1]); pipe_fds[p][1] = -1; }
-        }
-        free(pipe_fds);
-      }
-      return -1;
-    }
-
-    if (pid > 0) { /* parent: record that a real child was spawned */
-      any_child_spawned = 1;
-
-      if (job->pgid == 0) {
-        job->pgid = pid;
-        if (setpgid(pid, job->pgid) < 0 && errno != EACCES && errno != ESRCH) {
-          print_error("parent: setpgid failed");
-        }
-      } else {
-        if (setpgid(pid, job->pgid) < 0 && errno != EACCES && errno != ESRCH) {
-          print_error("parent: join pgid failed");
-        }
-      }
-    }
-
-    /* Parent closes ends it doesn't need anymore (standard pipeline pattern) */
-    if (i != 0) {
-      /* after forking command i, parent no longer needs the read end of pipe i-1 */
-      if (pipe_fds[i - 1][0] != -1) { close(pipe_fds[i - 1][0]); pipe_fds[i - 1][0] = -1; }
-    }
-    if (i != num_cmds - 1) {
-      /* parent no longer needs the write end of pipe i */
-      if (pipe_fds[i][1] != -1) { close(pipe_fds[i][1]); pipe_fds[i][1] = -1; }
-    }
-  }
-
-  /* cleanup: ensure any remaining fds are closed */
-  if (pipe_fds) {
-    for (int p = 0; p < num_pipes; ++p) {
-      if (pipe_fds[p][0] != -1) { close(pipe_fds[p][0]); pipe_fds[p][0] = -1; }
-      if (pipe_fds[p][1] != -1) { close(pipe_fds[p][1]); pipe_fds[p][1] = -1; }
-    }
+    close_pipes(pipe_fds, num_pipes);
     free(pipe_fds);
-  }
 
-  /* All commands were parent-only? */
-  if (!any_child_spawned) {
-    job->state = DONE;
-    return 0;
-  }
-
-  if (!job->background) {
-    if (job->pgid <= 0) {
-      print_error("Invalid process group for job");
-      return -1;
-    }
-    int status = wait_for_process_group(job->pgid);
-    job->state = DONE;
-    return status;
-  }
-
-  return 0;
+    return finalize_job(job, any_child_spawned);
 }
 
 void kill_job_list(Job** jobs, int jobs_num)

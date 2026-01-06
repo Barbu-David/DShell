@@ -76,6 +76,7 @@ void copy_command(Command* src, Command* dst)
 
   dst->execute = src->execute;
 }
+
 void child(Command* command, Shell* dshell) 
 {
   if (!command || !command->args || !command->args[0]) {
