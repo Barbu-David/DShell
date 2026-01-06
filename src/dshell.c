@@ -1,6 +1,5 @@
 #include <stdlib.h>
-#include <errno.h>
-#include <string.h>
+
 #include "dshell.h"
 #include "ui.h"
 #include "read_write.h"
@@ -39,7 +38,6 @@ void shell_error(Shell* dshell, Job* job)
   print_error("Failed to execute program shell");
   remove_job(dshell, job);
   free_job(job);
-  job = NULL;
 }
 
 void shell_step(Shell* dshell) 
@@ -54,7 +52,10 @@ void shell_step(Shell* dshell)
 
   int status = launch_job(job, dshell);
 
-  if (status == -1) shell_error(dshell, job);
+  if (status == -1) {
+    shell_error(dshell, job);
+    job=NULL;
+  }
 
   if (job && job->history) {
     copy_job(job, dshell->lastJob);
@@ -70,7 +71,7 @@ void add_job(Shell* dshell, Job* job)
 
   if(!job) return;
 
-  if(dshell->curr_jobs >= dshell->job_capacity || !job) return; 
+  if(dshell->curr_jobs >= dshell->job_capacity || !job) return; // Fix this. Add error handling and resizing 
   job->id=dshell->curr_jobs;
   for(int i=0; i<job->command_num; i++) job->commands[i]->job_id=job->id;
 
@@ -80,19 +81,21 @@ void add_job(Shell* dshell, Job* job)
 
 void remove_job(Shell* dshell, Job* job)
 {
-  if (!dshell || !job) return;
+  if (!job) return;
   int idx = job->id;
 
-  if (idx < 0 || idx >= dshell->curr_jobs) return;
+  if (idx < 0 || idx >= dshell->curr_jobs) return; // TO DO add error handling
 
   dshell->curr_jobs--; 
+
   dshell->jobs[idx] = dshell->jobs[dshell->curr_jobs]; 
-  if (dshell->jobs[idx]) dshell->jobs[idx]->id = idx;    
+  if (dshell->jobs[idx]) dshell->jobs[idx]->id = idx; // TO DO update command ids  
   dshell->jobs[dshell->curr_jobs] = NULL;
 }
 
-void reap_background_jobs(struct Shell *dshell) {
-  if (!dshell) return;
+
+//this should be split into two function: one to mark the jobs as done, the other to free DONE jobs
+void reap_background_jobs(Shell *dshell) {
 
   for (int i = 0; i < dshell->curr_jobs;) {
     Job *job = dshell->jobs[i];
@@ -132,9 +135,3 @@ void reap_background_jobs(struct Shell *dshell) {
 }
 
 
-Job* clone_job(const Job* src) {
-  if (!src) return NULL;
-  Job* dst = init_job(src->command_num);
-  copy_job((Job*)src, dst);
-  return dst;
-}

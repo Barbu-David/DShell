@@ -33,8 +33,7 @@ void shell_step(Shell* dshell);
 void shell_close(Shell* dshell);
 void add_job(Shell* dshell, Job* job);
 void remove_job(Shell* dshell, Job* job);
-
 void reap_background_jobs(Shell *dshell);
-Job* clone_job(const Job* src); 
+
 #endif 
 

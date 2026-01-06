@@ -68,8 +68,11 @@ void copy_job(Job* src_job, Job* dst_job) {
 
 void free_job(Job* job)
 {
-  for(int i = 0; i<job->command_num; i++) free_command(job->commands[i]);
+  if(!job) return;
+  if(job->commands) {
+  for(int i = 0; i<job->command_num; i++) if(job->commands[i]) free_command(job->commands[i]);
   free(job->commands);
+  }
   free(job);
 }
 

@@ -12,7 +12,7 @@ all: $(OUT)
 $(OUT): $(SOURCES) $(HEADERS)
 	$(CC) $(CFLAGS) -o $(OUT) $(SOURCES)
 
-bdebug: CFLAGS += -g
+bdebug: CFLAGS += -g -pg
 bdebug: $(OUT)
 
 clean:

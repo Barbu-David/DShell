@@ -57,7 +57,9 @@ int dsh_history(Command* command, Shell* dshell)
     return 0;
   }
 
-  Job* job = clone_job(dshell->lastJob);
+  Job* job = init_job(dshell->lastJob->command_num);
+  copy_job(dshell->lastJob, job);
+
   if (!job) {
     print_error("Failed to clone history");
     return 1;
@@ -65,8 +67,7 @@ int dsh_history(Command* command, Shell* dshell)
 
   add_job(dshell, job);
 
-  int status = launch_job(job, dshell);
-  return status;
+  return launch_job(job, dshell);
 }
 
 
