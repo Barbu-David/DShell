@@ -25,15 +25,6 @@ Shell* shell_init() {
   return dshell;
 }
 
-static void set_job_id_for_commands(Job *job, int job_id) {
-    if (!job) return;
-    for (int i = 0; i < job->command_num; ++i) {
-        if (job->commands && job->commands[i]) {
-            job->commands[i]->job_id = job_id;
-        }
-    }
-}
-
 void remove_job(Shell* dshell, Job* job)
 {
   if (!job) return;

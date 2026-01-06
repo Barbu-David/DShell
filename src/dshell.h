@@ -18,7 +18,6 @@ typedef struct Shell {
 
   bool running;
 
-
   Job* lastJob;  
 
   Job** jobs;

@@ -70,113 +70,163 @@ void free_job(Job* job)
 {
   if(!job) return;
   if(job->commands) {
-  for(int i = 0; i<job->command_num; i++) if(job->commands[i]) free_command(job->commands[i]);
-  free(job->commands);
+    for(int i = 0; i<job->command_num; i++) if(job->commands[i]) free_command(job->commands[i]);
+    free(job->commands);
   }
   free(job);
+}
+
+static int count_args(char **raw_args) {
+  int c = 0;
+  while (raw_args && raw_args[c]) c++;
+  return c;
+}
+
+static bool detect_and_strip_background(char** raw_args, int* argc_out) {
+  if (!raw_args || !argc_out) return false;
+  int argc = count_args(raw_args);
+  if (argc == 0) {
+    *argc_out = 0;
+    return false;
+  }
+  if (strcmp(raw_args[argc - 1], "&") == 0) {
+    raw_args[argc - 1] = NULL; 
+    *argc_out = argc - 1;
+    return true;
+  }
+  *argc_out = argc;
+  return false;
+}
+
+static bool pipeline_capacity_or_cleanup(int cmd_num, char*** cmd_args, char** raw_args) {
+  if (cmd_num + 1 >= MAX_PIPELINE_LENGTH) {
+    print_error("Pipeline too long");
+    free(cmd_args);
+    free(raw_args);
+    return false;
+  }
+
+  return true;
+}
+
+static char** make_segment(char** raw_args, int start, int len) {
+    char** seg = init_args(len);
+    if (!seg) return NULL;
+
+    for (int k = 0; k < len; ++k) seg[k] = raw_args[start + k];
+
+    seg[len] = NULL;  
+    return seg;
+}
+
+static void populate_job_commands(Job *job, char ***cmd_args, char **raw_args, Shell *dshell) {
+
+  if (job->command_num == 1) {
+    job->commands[0] = build_command(raw_args, dshell, only_parser);
+    return;
+  }
+
+  job->commands[0] = build_command(cmd_args[0], dshell, first_parser);
+  job->commands[job->command_num - 1] = build_command(cmd_args[job->command_num - 1], dshell, final_parser);
+  for (int j = 1; j < job->command_num - 1; j++) job->commands[j] = build_command(cmd_args[j], dshell, middle_parser);
+
+}
+
+static void free_cmd_args(char*** cmd_args, int ncmds) {
+    if (!cmd_args) return;
+    for (int j = 0; j < ncmds; ++j) if (cmd_args[j]) free(cmd_args[j]);
+    free(cmd_args);
 }
 
 Job* build_job(char** raw_args, Shell* dshell)
 {
 
   if (!raw_args) return NULL;
-  if (raw_args[0] == NULL){ 
+  if (raw_args[0] == NULL){
     free(raw_args);
     return NULL;
   }
-
-  int cmd_num = 0;      
-  int i = 0;
-  int start = 0;
+  
+  int argc = 0;
+  bool background = detect_and_strip_background(raw_args, &argc);
 
   char*** cmd_args = sf_malloc(sizeof(char**) * MAX_PIPELINE_LENGTH);
+  for (int z = 0; z < MAX_PIPELINE_LENGTH; z++) cmd_args[z] = NULL;
 
-  while (raw_args[i]) {
 
-    if (strcmp(raw_args[i], "|") == 0) {
+  int cmd_num = 0;
+  int start = 0;
 
-      if (cmd_num + 1 >= MAX_PIPELINE_LENGTH) {
-        print_error("Pipeline too long");
-        free(cmd_args);
-        free(raw_args);
-        return NULL;
-      }
-
-      cmd_args[cmd_num] = init_args(i - start);
-
-      int k = 0;
-      for (int h = start; h < i; h++)
-        cmd_args[cmd_num][k++] = raw_args[h];
-
-      cmd_num++;
-      start = i + 1;
-    }
-
-    i++;
+  for (int i = 0; i <= argc; ++i) if (i == argc || strcmp(raw_args[i], "|") == 0) {
+    if (!pipeline_capacity_or_cleanup(cmd_num, cmd_args, raw_args)) return NULL;
+    cmd_args[cmd_num++] = make_segment(raw_args, start, i - start);
+    start = i + 1; 
   }
 
-  cmd_args[cmd_num] = init_args(i - start);
+  Job* job = init_job(cmd_num);
+  job->background = background;
 
-  int k = 0;
-  for (int h = start; h < i; h++)
-    cmd_args[cmd_num][k++] = raw_args[h];
-
-  Job* job = init_job(cmd_num + 1);
-  job->background = (strcmp(raw_args[i - 1], "&") == 0);
+  populate_job_commands(job, cmd_args, raw_args, dshell);
   
-  if (job->command_num > 1) {
+  free_cmd_args(cmd_args, cmd_num);
 
-    job->commands[0] =
-      build_command(cmd_args[0], dshell, first_parser);
-
-    job->commands[job->command_num - 1] =
-      build_command(cmd_args[job->command_num - 1], dshell, final_parser);
-
-    for (int j = 1; j < job->command_num - 1; j++)
-      job->commands[j] =
-        build_command(cmd_args[j], dshell, middle_parser);
-
-  } else {
-    job->commands[0] =
-      build_command(raw_args, dshell, only_parser);
-  }
-
-  for (int j = 0; j <= cmd_num; j++)
-    free(cmd_args[j]);
-
-  free(cmd_args);
   free(raw_args);
+
   return job;
 }
 
 int wait_for_process_group(pid_t pgid)
 {
-  int status;
-  pid_t pid;
-  int all_ok = 1;
+int status;
+pid_t pid;
+int all_ok = 1;
 
-  for (;;) {
-    pid = waitpid(-pgid, &status, 0);
+for (;;) {
+  pid = waitpid(-pgid, &status, 0);
 
-    if (pid > 0) {
-      if (WIFEXITED(status)) {
-        if (WEXITSTATUS(status) != 0) {
-          all_ok = -1;
-        }
-      } else if (WIFSIGNALED(status)) {
+  if (pid > 0) {
+    if (WIFEXITED(status)) {
+      if (WEXITSTATUS(status) != 0) {
         all_ok = -1;
       }
+    } else if (WIFSIGNALED(status)) {
+      all_ok = -1;
+    }
+  } else {
+    if (errno == ECHILD) {
+      break;
     } else {
-      if (errno == ECHILD) {
-        break;
-      } else {
-        all_ok = -1;
-        break;
-      }
+      all_ok = -1;
+      break;
     }
   }
+}
 
-  return all_ok;
+return all_ok;
+}
+
+
+static void close_pipes(int (*pipe_fds)[2], int num_pipes) {
+    if (!pipe_fds) return;
+    for (int i = 0; i < num_pipes; i++) {
+        if (pipe_fds[i][0] != -1) { close(pipe_fds[i][0]); pipe_fds[i][0] = -1; }
+        if (pipe_fds[i][1] != -1) { close(pipe_fds[i][1]); pipe_fds[i][1] = -1; }
+    }
+}
+
+static int (*allocate_pipes(int num_pipes))[2] {
+    if (num_pipes == 0) return NULL;
+    int (*fds)[2] = sf_malloc(sizeof(int[2]) * num_pipes);
+    for (int i = 0; i < num_pipes; i++) fds[i][0] = fds[i][1] = -1;
+    for (int i = 0; i < num_pipes; i++) {
+        if (pipe(fds[i]) < 0) {
+            close_pipes(fds, i);
+            free(fds);
+            print_error("pipe creation failed");
+            return NULL;
+        }
+    }
+    return fds;
 }
 
 int launch_job(Job* job, Shell* dshell)
