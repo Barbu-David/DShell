@@ -25,6 +25,81 @@ Shell* shell_init() {
   return dshell;
 }
 
+static void set_job_id_for_commands(Job *job, int job_id) {
+    if (!job) return;
+    for (int i = 0; i < job->command_num; ++i) {
+        if (job->commands && job->commands[i]) {
+            job->commands[i]->job_id = job_id;
+        }
+    }
+}
+
+void remove_job(Shell* dshell, Job* job)
+{
+  if (!job) return;
+  int idx = job->id;
+
+  if (idx < 0 || idx >= dshell->curr_jobs) return; // TO DO add error handling
+
+  dshell->curr_jobs--; 
+
+  dshell->jobs[idx] = dshell->jobs[dshell->curr_jobs]; 
+  if (dshell->jobs[idx]) dshell->jobs[idx]->id = idx; // TO DO update command ids  
+  dshell->jobs[dshell->curr_jobs] = NULL;
+}
+
+void add_job(Shell* dshell, Job* job)
+{
+
+  if(!job) return;
+
+  if(dshell->curr_jobs >= dshell->job_capacity || !job) return; // Fix this. Add error handling and resizing 
+  job->id=dshell->curr_jobs;
+  for(int i=0; i<job->command_num; i++) job->commands[i]->job_id=job->id;
+
+  dshell->jobs[dshell->curr_jobs++]=job;
+
+}
+
+void reap_background_jobs(Shell *dshell) {
+    for (int i = 0; i < dshell->curr_jobs; i++) {
+        Job *job = dshell->jobs[i];
+
+        if (!job)
+            continue;
+
+        if (!job->background || job->state != RUNNING)
+            continue;
+
+        int status;
+        pid_t w;
+
+        errno = 0;
+        while ((w = waitpid(-job->pgid, &status, WNOHANG)) > 0) {
+            job->state = DONE;
+        }
+
+        if (w < 0 && errno != ECHILD) {
+            print_error("waitpid(-pgid, WNOHANG) failed");
+            print_error(strerror(errno));
+        }
+    }
+}
+
+void remove_done_jobs(Shell *dshell) {
+    for (int i = 0; i < dshell->curr_jobs; ) {
+        Job *job = dshell->jobs[i];
+
+        if (!job || job->state != DONE) {
+            i++;
+            continue;
+        }
+
+        remove_job(dshell, job);
+        free_job(job);
+    }
+}
+
 void shell_close(Shell* dshell) 
 {
   free_job(dshell->lastJob);
@@ -63,75 +138,8 @@ void shell_step(Shell* dshell)
   }
 
   reap_background_jobs(dshell);
+  remove_done_jobs(dshell);
+
   free(line);
 }
-
-void add_job(Shell* dshell, Job* job)
-{
-
-  if(!job) return;
-
-  if(dshell->curr_jobs >= dshell->job_capacity || !job) return; // Fix this. Add error handling and resizing 
-  job->id=dshell->curr_jobs;
-  for(int i=0; i<job->command_num; i++) job->commands[i]->job_id=job->id;
-
-  dshell->jobs[dshell->curr_jobs++]=job;
-
-}
-
-void remove_job(Shell* dshell, Job* job)
-{
-  if (!job) return;
-  int idx = job->id;
-
-  if (idx < 0 || idx >= dshell->curr_jobs) return; // TO DO add error handling
-
-  dshell->curr_jobs--; 
-
-  dshell->jobs[idx] = dshell->jobs[dshell->curr_jobs]; 
-  if (dshell->jobs[idx]) dshell->jobs[idx]->id = idx; // TO DO update command ids  
-  dshell->jobs[dshell->curr_jobs] = NULL;
-}
-
-
-//this should be split into two function: one to mark the jobs as done, the other to free DONE jobs
-void reap_background_jobs(Shell *dshell) {
-
-  for (int i = 0; i < dshell->curr_jobs;) {
-    Job *job = dshell->jobs[i];
-    if (!job) {
-      i++;
-      continue;
-    }
-
-    if (!job->background && job->state != DONE) {
-      i++;
-      continue;
-    }
-
-    int status;
-    pid_t w;
-
-    if (job->background && job->state == RUNNING) {
-      while ((w = waitpid(-job->pgid, &status, WNOHANG)) > 0) {
-        // Update job state if needed
-        job->state = DONE;
-      }
-
-      if (w == 0) {
-        i++;
-        continue;
-      } else if (w < 0 && errno != ECHILD) {
-        print_error("waitpid(-pgid, WNOHANG) failed");
-        print_error(strerror(errno));
-        i++;
-        continue;
-      }
-    }
-
-    remove_job(dshell, job);
-    free_job(job);
-  }
-}
-
 
